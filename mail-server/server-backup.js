@@ -569,48 +569,47 @@ const broadcastToClients = (event, data) => {
 
 // Check for new mails and notify clients
 const checkForNewMails = () => {
-  try {
-    const newStats = scanMailDirectory();
-    const hasNewMails = newStats.newMails > mailStats.newMails;
-    const hasChanges = JSON.stringify(newStats) !== JSON.stringify(mailStats);
+  const newStats = scanMailDirectory();
+  const hasNewMails = newStats.newMails > mailStats.newMails;
+  const hasChanges = JSON.stringify(newStats) !== JSON.stringify(mailStats);
 
-    if (hasChanges) {
-      mailStats = newStats;
+  if (hasChanges) {
+    mailStats = newStats;
 
-      // Broadcast updated stats
-      broadcastToClients("mailStatsUpdate", mailStats);
+    // Broadcast updated stats
+    broadcastToClients("mailStatsUpdate", mailStats);
 
-      if (hasNewMails) {
-        console.log(`🆕 New mails detected! Count: ${newStats.newMails}`);
+    if (hasNewMails) {
+      console.log(`🆕 New mails detected! Count: ${newStats.newMails}`);
 
-        // Auto-assign new mails to leader PICs with error handling
-        try {
-          const autoAssignResult = autoAssignNewMails();
-          if (autoAssignResult && autoAssignResult.assignedCount > 0) {
-            console.log(`🎯 Auto-assigned ${autoAssignResult.assignedCount} mail(s) to leader PICs`);
-            
-            // Broadcast auto-assignment notification
-            broadcastToClients("autoAssignmentCompleted", {
-              assignedCount: autoAssignResult.assignedCount,
-              results: autoAssignResult.results,
-              timestamp: new Date()
-            });
-          }
-        } catch (autoAssignError) {
-          console.error("❌ Error in auto-assignment (non-fatal):", autoAssignError.message);
-        }
-
-        // Notify clients about new mails but don't trigger auto-reload
-        broadcastToClients("newMailsDetected", {
-          count: newStats.newMails,
-          timestamp: new Date(),
-          shouldReload: false,
-          autoAssigned: 0 // Safe fallback
+      // TEMPORARILY DISABLE AUTO-ASSIGNMENT FOR DEBUGGING
+      /*
+      // Auto-assign new mails to leader PICs
+      const autoAssignResult = autoAssignNewMails();
+      if (autoAssignResult.assignedCount > 0) {
+        console.log(`🎯 Auto-assigned ${autoAssignResult.assignedCount} mail(s) to leader PICs`);
+        
+        // Broadcast auto-assignment notification
+        broadcastToClients("autoAssignmentCompleted", {
+          assignedCount: autoAssignResult.assignedCount,
+          results: autoAssignResult.results,
+          timestamp: new Date()
         });
       }
+      */
+
+      // DON'T automatically set reload status - let user control manually
+      // const reloadStatus = { "Reload status": true };
+      // writeJsonFile(RELOAD_STATUS_FILE, reloadStatus);
+
+      // Notify clients about new mails but don't trigger auto-reload
+      broadcastToClients("newMailsDetected", {
+        count: newStats.newMails,
+        timestamp: new Date(),
+        shouldReload: false, // Changed to false to prevent auto-reload
+        autoAssigned: 0 // autoAssignResult.assignedCount || 0
+      });
     }
-  } catch (error) {
-    console.error("❌ Error in checkForNewMails (non-fatal):", error.message);
   }
 };
 
@@ -1293,6 +1292,26 @@ const watcher = chokidar.watch(MAIL_DATA_PATH, {
   ignoreInitial: true,
 });
 
+// Helper function to find group leader
+const findGroupLeader = (groupId) => {
+  const picsPath = path.join(ASSIGNMENT_DATA_PATH, "PIC");
+  if (!fs.existsSync(picsPath)) return null;
+
+  const files = fs.readdirSync(picsPath).filter((f) => f.endsWith(".json"));
+  for (const file of files) {
+    const picData = readJsonFile(path.join(picsPath, file));
+    if (
+      picData &&
+      picData.isLeader &&
+      picData.groups &&
+      picData.groups.includes(groupId)
+    ) {
+      return picData;
+    }
+  }
+  return null;
+};
+
 watcher
   .on("add", (filePath) => {
     if (filePath.endsWith(".json") && filePath.includes("DungHan\\mustRep")) {
@@ -1300,66 +1319,31 @@ watcher
 
       setTimeout(() => {
         try {
-          let mailData = readJsonFile(filePath);
+          const mailData = readJsonFile(filePath);
           if (mailData && !mailData.assignedTo) {
-            console.log(`🎯 Auto-assigning leader for new mail from: ${mailData.From}`);
-            
-            // Use the existing auto-assignment function
-            const updatedMailData = autoAssignLeaderBySenderGroup(mailData, filePath);
-            
-            if (updatedMailData.assignedTo) {
-              console.log(`✅ Mail auto-assigned to: ${updatedMailData.assignedTo.picName} (${updatedMailData.assignedTo.picEmail})`);
-              
-              // Broadcast update to connected clients
-              broadcastToClients("mailAssigned", {
-                mail: updatedMailData,
-                fileName: path.basename(filePath),
-                category: "DungHan",
-                status: "mustRep",
-                timestamp: new Date()
-              });
-            } else {
-              console.log(`ℹ️ No auto-assignment found for sender: ${mailData.From}`);
+            // Assuming the group can be determined from the mail's "To" address or other logic
+            // This is a placeholder for the actual logic to determine the group
+            const groupId = "GROUP_ID_TO_BE_DETERMINED"; // Replace with actual logic
+
+            const leader = findGroupLeader(groupId);
+            if (leader) {
+              mailData.assignedTo = {
+                type: "pic",
+                picId: leader.id,
+                picName: leader.name,
+                assignedAt: new Date().toISOString(),
+              };
+              writeJsonFile(filePath, mailData);
+              console.log(
+                `📧 Automatically assigned new mail ${path.basename(
+                  filePath
+                )} to leader ${leader.name}`
+              );
             }
           }
         } catch (error) {
           console.error(
             `Error auto-assigning mail ${path.basename(filePath)}:`,
-            error
-          );
-        }
-        checkForNewMails();
-      }, 1000);
-    } else if (filePath.endsWith(".json") && filePath.includes("QuaHan\\mustRep")) {
-      console.log(`📁 New expired mail file detected: ${path.basename(filePath)}`);
-
-      setTimeout(() => {
-        try {
-          let mailData = readJsonFile(filePath);
-          if (mailData && !mailData.assignedTo) {
-            console.log(`🎯 Auto-assigning leader for new expired mail from: ${mailData.From}`);
-            
-            // Use the existing auto-assignment function
-            const updatedMailData = autoAssignLeaderBySenderGroup(mailData, filePath);
-            
-            if (updatedMailData.assignedTo) {
-              console.log(`✅ Expired mail auto-assigned to: ${updatedMailData.assignedTo.picName} (${updatedMailData.assignedTo.picEmail})`);
-              
-              // Broadcast update to connected clients
-              broadcastToClients("mailAssigned", {
-                mail: updatedMailData,
-                fileName: path.basename(filePath),
-                category: "QuaHan",
-                status: "mustRep",
-                timestamp: new Date()
-              });
-            } else {
-              console.log(`ℹ️ No auto-assignment found for expired mail sender: ${mailData.From}`);
-            }
-          }
-        } catch (error) {
-          console.error(
-            `Error auto-assigning expired mail ${path.basename(filePath)}:`,
             error
           );
         }
@@ -1383,8 +1367,8 @@ watcher
     }
   });
 
-// Periodic check (temporarily disabled for debugging)
-// setInterval(checkForNewMails, 10000); // Check every 10 seconds
+// Periodic check (backup mechanism)
+setInterval(checkForNewMails, 10000); // Check every 10 seconds
 
 // Periodic check for expired mails and auto-move them - DISABLED for performance
 // setInterval(() => {
@@ -2234,37 +2218,9 @@ app.post("/api/refresh-pics", (req, res) => {
   console.log("� Refresh endpoint called");
   res.json({ 
     success: true, 
-    message: "PICs refreshed successfully! Auto-assigned 0 mail(s) from 0 checked.",
-    assignedCount: 0,
-    totalChecked: 0,
-    results: [],
+    message: "Test response",
     timestamp: new Date()
   });
-});
-
-// Manual trigger for auto-assignment testing
-app.post("/api/trigger-auto-assign", (req, res) => {
-  try {
-    console.log("🔄 Manual auto-assignment triggered");
-    
-    // Test response without calling auto-assignment
-    res.json({
-      success: true,
-      message: "Auto-assignment test completed (logic disabled for debugging)",
-      assignedCount: 0,
-      totalChecked: 0,
-      results: [],
-      timestamp: new Date()
-    });
-    
-  } catch (error) {
-    console.error("Error in manual auto-assignment:", error);
-    res.status(500).json({
-      success: false,
-      error: error.message,
-      timestamp: new Date()
-    });
-  }
 });
 
 // Health check endpoint

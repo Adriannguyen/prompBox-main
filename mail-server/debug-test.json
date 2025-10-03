@@ -1,0 +1,12 @@
+{
+  "mailId": "debug-mustrep-003",
+  "mailData": {
+    "Subject": "Debug Test - mustRep folder",
+    "From": "debug@test.com",
+    "Type": "To", 
+    "Date": ["2025-10-01", "16:00"],
+    "SummaryContent": "Debug test mail for mustRep folder",
+    "isRead": "false",
+    "id": "debug-mustrep-003"
+  }
+}

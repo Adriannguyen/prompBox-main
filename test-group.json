@@ -1,0 +1,13 @@
+{
+  "name": "IT Support Group",
+  "description": "Technical support team for IT infrastructure",
+  "pic": "John Doe",
+  "picEmail": "john.doe@company.com",
+  "members": [
+    "admin@company.com",
+    "test@company.com",
+    "support@company.com"
+  ],
+  "createdAt": "2024-10-02T14:30:00.000Z",
+  "updatedAt": "2024-10-02T14:30:00.000Z"
+}

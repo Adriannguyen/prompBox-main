@@ -33,6 +33,16 @@ const MailTable = ({
   onSelectAll,
   showCheckboxes = false,
 }) => {
+  // Sticky styles for checkbox column
+  const stickyCheckboxStyle = {
+    position: 'sticky',
+    left: 0,
+    zIndex: 10,
+    backgroundColor: 'white',
+    minWidth: '60px',
+    maxWidth: '60px',
+    width: '60px'
+  };
   // Debug log to check props
   console.log("🔧 MailTable props:", {
     mailType,
@@ -128,25 +138,26 @@ const MailTable = ({
   };
 
   return (
-    <Table className="align-items-center table-flush" responsive>
-      <thead className="thead-light">
-        <tr>
-          {showCheckboxes && (
-            <th
-              scope="col"
-              style={{
-                width: "50px",
-                textAlign: "center",
-                verticalAlign: "middle",
-              }}
-            >
-              <Input
-                type="checkbox"
-                onChange={(e) => onSelectAll && onSelectAll(e.target.checked)}
-                checked={
-                  selectedMails.length > 0 &&
-                  selectedMails.length === mails.length
-                }
+    <div className="mail-table-wrapper">
+      <Table className="align-items-center table-flush" responsive>
+        <thead className="thead-light">
+          <tr>
+            {showCheckboxes && (
+              <th
+                scope="col"
+                style={{
+                  ...stickyCheckboxStyle,
+                  textAlign: "center",
+                  verticalAlign: "middle",
+                }}
+              >
+                <Input
+                  type="checkbox"
+                  onChange={(e) => onSelectAll && onSelectAll(e.target.checked)}
+                  checked={
+                    selectedMails.length > 0 &&
+                    selectedMails.length === mails.length
+                  }
                 style={{ margin: "0 auto" }}
               />
             </th>
@@ -176,7 +187,11 @@ const MailTable = ({
           return (
             <tr key={uniqueKey}>
               {showCheckboxes && (
-                <td style={{ textAlign: "center", verticalAlign: "middle" }}>
+                <td style={{ 
+                  ...stickyCheckboxStyle,
+                  textAlign: "center", 
+                  verticalAlign: "middle",
+                }}>
                   <Input
                     type="checkbox"
                     checked={isSelected}
@@ -439,6 +454,7 @@ const MailTable = ({
         })}
       </tbody>
     </Table>
+    </div>
   );
 };
 

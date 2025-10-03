@@ -1,0 +1,9 @@
+{
+    "Subject": "Test Mail - Rep folder",
+    "From": "test@example.com",
+    "Type": "To", 
+    "Date": ["2025-10-01", "15:00"],
+    "SummaryContent": "Test mail for rep folder logic testing",
+    "isRead": "false",
+    "id": "test-rep-002"
+}

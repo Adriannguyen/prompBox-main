@@ -145,9 +145,11 @@ const Assignment = () => {
   const [groupModal, setGroupModal] = useState(false);
   const [picModal, setPicModal] = useState(false);
   const [userModal, setUserModal] = useState(false);
+  const [groupPicsModal, setGroupPicsModal] = useState(false);
   const [editingGroup, setEditingGroup] = useState(null);
   const [editingPic, setEditingPic] = useState(null);
   const [editingUser, setEditingUser] = useState(null);
+  const [editingGroupForPics, setEditingGroupForPics] = useState(null);
 
   // Form states
   const [groupForm, setGroupForm] = useState({
@@ -161,8 +163,6 @@ const Assignment = () => {
   const [picForm, setPicForm] = useState({
     name: "",
     email: "",
-    groups: [],
-    isLeader: false,
   });
 
   // User form state
@@ -378,7 +378,7 @@ const Assignment = () => {
           editingPic ? "PIC updated successfully" : "PIC created successfully"
         );
         setPicModal(false);
-        setPicForm({ name: "", email: "", groups: [], isLeader: false });
+        setPicForm({ name: "", email: "" });
         setEditingPic(null);
         loadPics();
       } else {
@@ -695,10 +695,98 @@ const Assignment = () => {
     setPicForm({
       name: pic.name,
       email: pic.email,
-      groups: pic.groups || [],
-      isLeader: pic.isLeader || false,
     });
     setPicModal(true);
+  };
+
+  const handleEditGroupPics = (group) => {
+    setEditingGroupForPics(group);
+    setGroupPicsModal(true);
+  };
+
+  const handleAddPicToGroup = async (picId, groupId) => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/pics/${picId}/groups`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ groupId }),
+      });
+
+      const result = await response.json();
+      if (result.success) {
+        setSuccess("PIC added to group successfully");
+        loadPics(); // Reload PICs data
+        loadGroups(); // Reload groups data
+      } else {
+        setError(result.error || "Failed to add PIC to group");
+      }
+    } catch (err) {
+      console.error("Error adding PIC to group:", err);
+      setError("Failed to add PIC to group");
+    }
+  };
+
+  const handleRemovePicFromGroup = async (picId, groupId) => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/pics/${picId}/groups/${groupId}`, {
+        method: "DELETE",
+      });
+
+      const result = await response.json();
+      if (result.success) {
+        setSuccess("PIC removed from group successfully");
+        loadPics(); // Reload PICs data
+        loadGroups(); // Reload groups data
+      } else {
+        setError(result.error || "Failed to remove PIC from group");
+      }
+    } catch (err) {
+      console.error("Error removing PIC from group:", err);
+      setError("Failed to remove PIC from group");
+    }
+  };
+
+  const handleSetLeader = async (picId, groupId) => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/pics/${picId}/groups/${groupId}/leader`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+
+      const result = await response.json();
+      if (result.success) {
+        setSuccess("PIC set as group leader successfully");
+        loadPics(); // Reload PICs data
+      } else {
+        setError(result.error || "Failed to set PIC as leader");
+      }
+    } catch (err) {
+      console.error("Error setting PIC as leader:", err);
+      setError("Failed to set PIC as leader");
+    }
+  };
+
+  const handleRemoveLeader = async (picId, groupId) => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/pics/${picId}/groups/${groupId}/leader`, {
+        method: "DELETE",
+      });
+
+      const result = await response.json();
+      if (result.success) {
+        setSuccess("PIC removed as group leader successfully");
+        loadPics(); // Reload PICs data
+      } else {
+        setError(result.error || "Failed to remove PIC as leader");
+      }
+    } catch (err) {
+      console.error("Error removing PIC as leader:", err);
+      setError("Failed to remove PIC as leader");
+    }
   };
 
   const handleDeleteGroup = async (groupId) => {
@@ -991,12 +1079,13 @@ const Assignment = () => {
     </Card>
   );
 
-  const renderPicsTab = () => (
+  const renderAddPicTab = () => (
     <Card className="shadow">
       <CardHeader className="border-0">
         <Row className="align-items-center">
           <div className="col">
-            <h3 className="mb-0">PIC Management</h3>
+            <h3 className="mb-0">Add New PIC</h3>
+            <p className="text-muted mb-0">Create new PIC accounts</p>
           </div>
           <div className="col text-right">
             <Button color="primary" size="sm" onClick={() => setPicModal(true)}>
@@ -1011,8 +1100,6 @@ const Assignment = () => {
             <tr>
               <th scope="col">Name</th>
               <th scope="col">Email</th>
-              <th scope="col">Role</th>
-              <th scope="col">Groups</th>
               <th scope="col">Created</th>
               <th scope="col">Actions</th>
             </tr>
@@ -1023,41 +1110,6 @@ const Assignment = () => {
                 <tr key={pic.id}>
                   <td>{pic.name}</td>
                   <td>{pic.email}</td>
-                  <td>
-                    <Badge color={pic.isLeader ? "success" : "info"}>
-                      {pic.isLeader ? "Leader" : "Member"}
-                    </Badge>
-                  </td>
-                  <td>
-                    <div>
-                      {/* <Badge color="secondary" className="mb-1">
-                      {pic.groups?.length || 0} groups
-                    </Badge> */}
-                      {pic.groups && pic.groups.length > 0 && (
-                        <div className="mt-1">
-                          {pic.groups.slice(0, 2).map((groupId) => {
-                            const group = groups.find((g) => g.id === groupId);
-                            return group ? (
-                              <div key={groupId} className="text-sm">
-                                <Badge
-                                  color="info"
-                                  className="mr-1 mb-1"
-                                  style={{ fontSize: "0.7rem" }}
-                                >
-                                  {group.name}
-                                </Badge>
-                              </div>
-                            ) : null;
-                          })}
-                          {pic.groups.length > 2 && (
-                            <small className="text-muted">
-                              +{pic.groups.length - 2} more...
-                            </small>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  </td>
                   <td>{new Date(pic.createdAt).toLocaleDateString()}</td>
                   <td>
                     <Button
@@ -1083,6 +1135,98 @@ const Assignment = () => {
       </CardBody>
     </Card>
   );
+
+  const renderAssignPicTab = () => (
+    <Card className="shadow">
+      <CardHeader className="border-0">
+        <Row className="align-items-center">
+          <div className="col">
+            <h3 className="mb-0">Assign PIC to Group</h3>
+            <p className="text-muted mb-0">Manage PIC assignments to groups</p>
+          </div>
+        </Row>
+      </CardHeader>
+      <CardBody>
+        <Table className="align-items-center table-flush" responsive>
+          <thead className="thead-light">
+            <tr>
+              <th scope="col">Group Name</th>
+              <th scope="col">Description</th>
+              <th scope="col">Assigned PICs</th>
+              <th scope="col">Created</th>
+              <th scope="col">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {Array.isArray(groups) &&
+              groups.map((group) => (
+                <tr key={group.id}>
+                  <td>
+                    <Badge color="info" pill>
+                      {group.name}
+                    </Badge>
+                  </td>
+                  <td>{group.description}</td>
+                  <td>
+                    <div>
+                      {/* Find PICs assigned to this group */}
+                      {(() => {
+                        const assignedPics = Array.isArray(pics) 
+                          ? pics.filter(pic => pic.groups && pic.groups.includes(group.id))
+                          : [];
+                        
+                        return assignedPics.length > 0 ? (
+                          <div className="mt-1">
+                            {assignedPics.slice(0, 2).map((pic, idx) => (
+                              <div key={idx} className="text-sm">
+                                <i className="ni ni-single-02 text-primary mr-1" />
+                                <Badge
+                                  color="success"
+                                  className="mr-1 mb-1"
+                                  style={{ fontSize: "0.7rem" }}
+                                >
+                                  {pic.name}
+                                  {pic.groupLeaderships && pic.groupLeaderships.includes(group.id) && (
+                                    <i className="ni ni-crown ml-1" title="Group Leader" />
+                                  )}
+                                </Badge>
+                              </div>
+                            ))}
+                            {assignedPics.length > 2 && (
+                              <small className="text-muted">
+                                +{assignedPics.length - 2} more...
+                              </small>
+                            )}
+                          </div>
+                        ) : (
+                          <Badge color="secondary" className="mb-1">
+                            No PICs assigned
+                          </Badge>
+                        );
+                      })()}
+                    </div>
+                  </td>
+                  <td>{new Date(group.createdAt).toLocaleDateString()}</td>
+                  <td>
+                    <Button
+                      color="primary"
+                      size="sm"
+                      className="mr-2"
+                      onClick={() => handleEditGroupPics(group)}
+                    >
+                      <i className="ni ni-settings mr-1" />
+                      Manage PICs
+                    </Button>
+                  </td>
+                </tr>
+              ))}
+          </tbody>
+        </Table>
+      </CardBody>
+    </Card>
+  );
+
+
 
   return (
     <>
@@ -1130,11 +1274,20 @@ const Assignment = () => {
                   </NavItem>
                   <NavItem>
                     <NavLink
-                      className={activeTab === "pics" ? "active" : ""}
-                      onClick={() => setActiveTab("pics")}
+                      className={activeTab === "add-pic" ? "active" : ""}
+                      onClick={() => setActiveTab("add-pic")}
                       style={{ cursor: "pointer" }}
                     >
-                      PIC
+                      Add New PIC
+                    </NavLink>
+                  </NavItem>
+                  <NavItem>
+                    <NavLink
+                      className={activeTab === "assign-pic" ? "active" : ""}
+                      onClick={() => setActiveTab("assign-pic")}
+                      style={{ cursor: "pointer" }}
+                    >
+                      Assign PIC to Group
                     </NavLink>
                   </NavItem>
                   <NavItem>
@@ -1156,7 +1309,8 @@ const Assignment = () => {
           <Col xl="12">
             <TabContent activeTab={activeTab}>
               <TabPane tabId="groups">{renderGroupsTab()}</TabPane>
-              <TabPane tabId="pics">{renderPicsTab()}</TabPane>
+              <TabPane tabId="add-pic">{renderAddPicTab()}</TabPane>
+              <TabPane tabId="assign-pic">{renderAssignPicTab()}</TabPane>
               <TabPane tabId="users">{renderUsersTab()}</TabPane>
             </TabContent>
           </Col>
@@ -1316,7 +1470,7 @@ const Assignment = () => {
             setPicModal(!picModal);
             if (!picModal) {
               setEditingPic(null);
-              setPicForm({ name: "", email: "", groups: [], isLeader: false });
+              setPicForm({ name: "", email: "" });
             }
           }}
         >
@@ -1324,7 +1478,7 @@ const Assignment = () => {
             toggle={() => {
               setPicModal(!picModal);
               setEditingPic(null);
-              setPicForm({ name: "", email: "", groups: [], isLeader: false });
+              setPicForm({ name: "", email: "" });
             }}
           >
             {editingPic ? "Edit PIC" : "Create New PIC"}
@@ -1355,85 +1509,12 @@ const Assignment = () => {
                   placeholder="Enter email address"
                 />
               </FormGroup>
-
-              {/* Groups Selection */}
-              <FormGroup>
-                <Label for="picGroups">Assign to Groups</Label>
-                <div
-                  className="border rounded p-3"
-                  style={{ maxHeight: "200px", overflowY: "auto" }}
-                >
-                  {Array.isArray(groups) && groups.length > 0 ? (
-                    groups.map((group) => (
-                      <FormGroup check key={group.id} className="mb-2">
-                        <Label check className="d-flex align-items-center">
-                          <Input
-                            type="checkbox"
-                            checked={picForm.groups.includes(group.id)}
-                            onChange={(e) => {
-                              if (e.target.checked) {
-                                setPicForm({
-                                  ...picForm,
-                                  groups: [...picForm.groups, group.id],
-                                });
-                              } else {
-                                setPicForm({
-                                  ...picForm,
-                                  groups: picForm.groups.filter(
-                                    (id) => id !== group.id
-                                  ),
-                                });
-                              }
-                            }}
-                            className="mr-2"
-                          />
-                          <div>
-                            <Badge color="info" className="mr-2">
-                              {group.name}
-                            </Badge>
-                            <small className="text-muted">
-                              {group.description}
-                            </small>
-                            <div className="text-xs text-muted mt-1">
-                              {group.members?.length || 0} members
-                            </div>
-                          </div>
-                        </Label>
-                      </FormGroup>
-                    ))
-                  ) : (
-                    <div className="text-center text-muted py-3">
-                      <i
-                        className="ni ni-fat-add text-muted"
-                        style={{ fontSize: "1.5rem" }}
-                      />
-                      <p className="mb-0 mt-2">No groups available</p>
-                      <small>Create groups first to assign PIC to them</small>
-                    </div>
-                  )}
-                </div>
-                {picForm.groups.length > 0 && (
-                  <div className="mt-2">
-                    <small className="text-success">
-                      <i className="fas fa-check mr-1" />
-                      Selected {picForm.groups.length} group(s)
-                    </small>
-                  </div>
-                )}
-              </FormGroup>
-
-              <FormGroup check>
-                <Label check>
-                  <Input
-                    type="checkbox"
-                    checked={picForm.isLeader}
-                    onChange={(e) =>
-                      setPicForm({ ...picForm, isLeader: e.target.checked })
-                    }
-                  />
-                  Is Leader
-                </Label>
-              </FormGroup>
+              <div className="mt-3 p-3 bg-light rounded">
+                <small className="text-muted">
+                  <i className="ni ni-info-circle mr-1" />
+                  <strong>Note:</strong> After creating the PIC, you can assign them to groups and set leadership roles in the "Assign PIC to Group" tab.
+                </small>
+              </div>
             </Form>
           </ModalBody>
           <ModalFooter>
@@ -1448,8 +1529,6 @@ const Assignment = () => {
                 setPicForm({
                   name: "",
                   email: "",
-                  groups: [],
-                  isLeader: false,
                 });
               }}
             >
@@ -1635,6 +1714,122 @@ const Assignment = () => {
               }}
             >
               Cancel
+            </Button>
+          </ModalFooter>
+        </Modal>
+
+        {/* Group PICs Management Modal */}
+        <Modal isOpen={groupPicsModal} size="lg">
+          <ModalHeader toggle={() => setGroupPicsModal(false)}>
+            Manage PICs for {editingGroupForPics?.name}
+          </ModalHeader>
+          <ModalBody>
+            {editingGroupForPics && (
+              <>
+                <h5>Currently Assigned PICs:</h5>
+                <div className="mb-4">
+                  {(() => {
+                    const assignedPics = Array.isArray(pics) 
+                      ? pics.filter(pic => pic.groups && pic.groups.includes(editingGroupForPics.id))
+                      : [];
+                    
+                    return assignedPics.length > 0 ? (
+                      <div>
+                        {assignedPics.map((pic) => (
+                          <div key={pic.id} className="d-flex justify-content-between align-items-center mb-2 p-2 border rounded">
+                            <div className="d-flex align-items-center">
+                              <div>
+                                <Badge color="success" className="mr-2">
+                                  {pic.name}
+                                </Badge>
+                                {pic.groupLeaderships && pic.groupLeaderships.includes(editingGroupForPics.id) && (
+                                  <Badge color="warning" className="mr-2">
+                                    <i className="ni ni-crown mr-1" />
+                                    Leader
+                                  </Badge>
+                                )}
+                                <small className="text-muted">({pic.email})</small>
+                              </div>
+                            </div>
+                            <div>
+                              {pic.groupLeaderships && pic.groupLeaderships.includes(editingGroupForPics.id) ? (
+                                <Button
+                                  color="outline-warning"
+                                  size="sm"
+                                  className="mr-2"
+                                  onClick={() => handleRemoveLeader(pic.id, editingGroupForPics.id)}
+                                >
+                                  <i className="ni ni-crown mr-1" />
+                                  Remove Leader
+                                </Button>
+                              ) : (
+                                <Button
+                                  color="warning"
+                                  size="sm"
+                                  className="mr-2"
+                                  onClick={() => handleSetLeader(pic.id, editingGroupForPics.id)}
+                                >
+                                  <i className="ni ni-crown mr-1" />
+                                  Set Leader
+                                </Button>
+                              )}
+                              <Button
+                                color="danger"
+                                size="sm"
+                                onClick={() => handleRemovePicFromGroup(pic.id, editingGroupForPics.id)}
+                              >
+                                Remove
+                              </Button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-muted">No PICs assigned to this group</div>
+                    );
+                  })()}
+                </div>
+
+                <hr />
+
+                <h5>Available PICs to Add:</h5>
+                <div>
+                  {(() => {
+                    const availablePics = Array.isArray(pics) 
+                      ? pics.filter(pic => !pic.groups || !pic.groups.includes(editingGroupForPics.id))
+                      : [];
+                    
+                    return availablePics.length > 0 ? (
+                      <div>
+                        {availablePics.map((pic) => (
+                          <div key={pic.id} className="d-flex justify-content-between align-items-center mb-2 p-2 border rounded">
+                            <div>
+                              <Badge color="info" className="mr-2">
+                                {pic.name}
+                              </Badge>
+                              <small className="text-muted">({pic.email})</small>
+                            </div>
+                            <Button
+                              color="primary"
+                              size="sm"
+                              onClick={() => handleAddPicToGroup(pic.id, editingGroupForPics.id)}
+                            >
+                              Add to Group
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-muted">All PICs are already assigned to this group</div>
+                    );
+                  })()}
+                </div>
+              </>
+            )}
+          </ModalBody>
+          <ModalFooter>
+            <Button color="secondary" onClick={() => setGroupPicsModal(false)}>
+              Close
             </Button>
           </ModalFooter>
         </Modal>

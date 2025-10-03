@@ -314,18 +314,111 @@ const ValidMails = () => {
 
   const handleRefreshPics = async () => {
     try {
-      await fetch(`${API_BASE_URL}/api/refresh-pics`, { method: "POST" });
-      setExpiredMovedAlert({
-        type: "success",
-        message: "PIC data refresh initiated.",
-        timestamp: new Date(),
+      const response = await fetch(`${API_BASE_URL}/api/refresh-pics`, {
+        method: "POST",
       });
-      setTimeout(() => setExpiredMovedAlert(null), 3000);
+      const result = await response.json();
+
+      if (result.success) {
+        setExpiredMovedAlert({
+          type: "success",
+          message: `PICs refreshed successfully! Auto-assigned ${
+            result.assignedCount || 0
+          } mail(s) from ${result.totalChecked || 0} checked.`,
+          timestamp: new Date(),
+        });
+
+        // Refresh the mail list to show updated assignments
+        fetchValidMails();
+      } else {
+        setExpiredMovedAlert({
+          type: "warning",
+          message: result.message || "PIC refresh completed with issues.",
+          timestamp: new Date(),
+        });
+      }
+
+      setTimeout(() => setExpiredMovedAlert(null), 5000);
     } catch (error) {
       console.error("Error refreshing PICs:", error);
       setExpiredMovedAlert({
         type: "danger",
         message: "Failed to refresh PIC data.",
+        timestamp: new Date(),
+      });
+      setTimeout(() => setExpiredMovedAlert(null), 3000);
+    }
+  };
+
+  const handleAutoAssignPICs = async () => {
+    if (selectedMails.length === 0) {
+      setExpiredMovedAlert({
+        type: "warning",
+        message: "Please select mails to auto-assign to PICs.",
+        timestamp: new Date(),
+      });
+      setTimeout(() => setExpiredMovedAlert(null), 3000);
+      return;
+    }
+
+    try {
+      const assignments = [];
+      const errors = [];
+
+      for (const mailId of selectedMails) {
+        try {
+          const response = await fetch(
+            `${API_BASE_URL}/api/refresh-pic-assignment`,
+            {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({ mailId }),
+            }
+          );
+
+          const result = await response.json();
+          if (result.success) {
+            assignments.push(result.assignment);
+          } else {
+            errors.push({ mailId, error: result.error });
+          }
+        } catch (err) {
+          errors.push({ mailId, error: err.message });
+        }
+      }
+
+      // Show results
+      if (assignments.length > 0) {
+        setExpiredMovedAlert({
+          type: "success",
+          message: `Successfully auto-assigned ${assignments.length} mail(s) to leader PICs.`,
+          timestamp: new Date(),
+        });
+
+        // Clear selections and refresh data
+        setSelectedMails([]);
+        if (refreshMails) {
+          refreshMails();
+        }
+      }
+
+      if (errors.length > 0) {
+        console.log("Auto-assign errors:", errors);
+        setExpiredMovedAlert({
+          type: "warning",
+          message: `${assignments.length} assigned, ${errors.length} failed. Check console for details.`,
+          timestamp: new Date(),
+        });
+      }
+
+      setTimeout(() => setExpiredMovedAlert(null), 5000);
+    } catch (error) {
+      console.error("Error in auto-assign PICs:", error);
+      setExpiredMovedAlert({
+        type: "danger",
+        message: "Failed to auto-assign mails to PICs.",
         timestamp: new Date(),
       });
       setTimeout(() => setExpiredMovedAlert(null), 3000);
@@ -464,7 +557,8 @@ const ValidMails = () => {
 
       // Reply status filter
       let matchesReplyStatus = true;
-      if (replyStatusFilter === "replied") matchesReplyStatus = isMailReplied(mail);
+      if (replyStatusFilter === "replied")
+        matchesReplyStatus = isMailReplied(mail);
       if (replyStatusFilter === "not_replied")
         matchesReplyStatus = !isMailReplied(mail);
 
@@ -637,16 +731,7 @@ const ValidMails = () => {
                   </div>
                   <div className="col-auto">
                     {/* <Button
-                      color="info"
-                      size="sm"
-                      onClick={refreshGroups}
-                      title="Refresh group data"
-                    >
-                      <i className="fas fa-sync-alt mr-1" />
-                      Refresh Groups
-                    </Button>
-                    <Button
-                      color="primary"
+                      color="secondary"
                       size="sm"
                       onClick={handleRefreshPics}
                       title="Refresh PIC data"
@@ -654,18 +739,18 @@ const ValidMails = () => {
                     >
                       <i className="fas fa-user-sync mr-1" />
                       Refresh PICs
-                    </Button>
+                    </Button> */}
                     <Button
-                      color="warning"
+                      color="primary"
                       size="sm"
-                      onClick={handleMoveSelectedToExpired}
+                      onClick={handleAutoAssignPICs}
                       className="ml-2"
                       disabled={selectedMails.length === 0}
-                      title={`Move ${selectedMails.length} selected mail(s) to Expired section`}
+                      title={`Auto-assign ${selectedMails.length} selected mail(s) to leader PICs based on sender domain`}
                     >
-                      <i className="fas fa-arrow-down mr-1" />
-                      Move Selected ({selectedMails.length})
-                    </Button> */}
+                      <i className="fas fa-magic mr-1" />
+                      Auto-assign PIC ({selectedMails.length})
+                    </Button>
                     <Button
                       color="info"
                       size="sm"
