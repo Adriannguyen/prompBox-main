@@ -329,7 +329,9 @@ const ValidMails = () => {
         });
 
         // Refresh the mail list to show updated assignments
-        fetchValidMails();
+        if (refreshMails) {
+          refreshMails();
+        }
       } else {
         setExpiredMovedAlert({
           type: "warning",

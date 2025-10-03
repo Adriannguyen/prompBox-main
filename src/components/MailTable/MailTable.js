@@ -35,13 +35,13 @@ const MailTable = ({
 }) => {
   // Sticky styles for checkbox column
   const stickyCheckboxStyle = {
-    position: 'sticky',
+    position: "sticky",
     left: 0,
     zIndex: 10,
-    backgroundColor: 'white',
-    minWidth: '60px',
-    maxWidth: '60px',
-    width: '60px'
+    backgroundColor: "white",
+    minWidth: "60px",
+    maxWidth: "60px",
+    width: "60px",
   };
   // Debug log to check props
   console.log("🔧 MailTable props:", {
@@ -88,9 +88,7 @@ const MailTable = ({
     } else if (mailType === "review" && getTimeSinceSent) {
       // For review mails, show time since sent
       const timeSince = getTimeSinceSent(mail.Date);
-      return (
-        <span className="text-sm text-muted">{timeSince}</span>
-      );
+      return <span className="text-sm text-muted">{timeSince}</span>;
     } else {
       // For all mails or fallback, show formatted date
       return (
@@ -101,7 +99,7 @@ const MailTable = ({
 
   const renderStatus = (mail) => {
     const isReplied = getReplyStatusFromMail(mail);
-    
+
     if (mailType === "review") {
       return (
         <Badge
@@ -158,302 +156,304 @@ const MailTable = ({
                     selectedMails.length > 0 &&
                     selectedMails.length === mails.length
                   }
-                style={{ margin: "0 auto" }}
-              />
-            </th>
-          )}
-          <th scope="col">Subject</th>
-          <th scope="col">Sender</th>
-          <th scope="col">Type</th>
-          <th scope="col">Reply Status</th>
-          <th scope="col">Assigned PIC</th>
-          {mailType !== "review" && mailType !== "all" && (
-            <th scope="col">Date</th>
-          )}
-          <th scope="col">{getDeadlineColumnTitle()}</th>
-          {mailType === "review" && <th scope="col">Original Status</th>}
-          <th scope="col" />
-        </tr>
-      </thead>
-      <tbody>
-        {mails.map((mail, index) => {
-          const mailId = mail.id || `${mail.Subject}-${mail.From}`;
-          const isSelected = selectedMails.includes(mailId);
-          // Create unique key using index, fileName and filePath to ensure uniqueness
-          const uniqueKey = `${index}-${mail.fileName || mailId}-${
-            mail.filePath || ""
-          }`.replace(/[^a-zA-Z0-9-_]/g, "-");
-
-          return (
-            <tr key={uniqueKey}>
-              {showCheckboxes && (
-                <td style={{ 
-                  ...stickyCheckboxStyle,
-                  textAlign: "center", 
-                  verticalAlign: "middle",
-                }}>
-                  <Input
-                    type="checkbox"
-                    checked={isSelected}
-                    onChange={(e) =>
-                      onSelectMail && onSelectMail(mailId, e.target.checked)
-                    }
-                    style={{ margin: "0 auto" }}
-                  />
-                </td>
-              )}
-              <th scope="row">
-                <Media className="align-items-center">
-                  <Media>
-                    <span
-                      className="mb-0 text-sm font-weight-bold text-primary cursor-pointer"
-                      onClick={() =>
-                        handleViewDetails && handleViewDetails(mail)
-                      }
-                      style={{ cursor: "pointer" }}
-                      title="Click to view details"
-                    >
-                      {truncateText(mail.Subject, 30)}
-                      {(() => {
-                        // Show NEW icon for DungHan/mustRep unread mails
-                        const shouldShowNew =
-                          mail &&
-                          mail.category === "DungHan" &&
-                          mail.status === "mustRep" &&
-                          !mail.isRead;
-
-                        if (shouldShowNew) {
-                          return (
-                            <Badge
-                              color="danger"
-                              pill
-                              className="ml-2"
-                              style={{
-                                fontSize: "0.6rem",
-                                animation: "pulse 2s infinite",
-                              }}
-                            >
-                              NEW
-                            </Badge>
-                          );
-                        }
-                        return null;
-                      })()}
-                    </span>
-                  </Media>
-                </Media>
+                  style={{ margin: "0 auto" }}
+                />
               </th>
-              <td>
-                {(() => {
-                  const groupInfo = getGroupInfo(mail.From);
-                  if (groupInfo.isGroup) {
-                    return (
-                      <span
-                        className="font-weight-bold"
-                        title={`Group: ${groupInfo.displayName}`}
-                      >
-                        {truncateText(groupInfo.displayName, 30)}
-                      </span>
-                    );
-                  } else {
-                    return (
-                      <DecryptedSender
-                        encryptedFrom={mail.From}
-                        fallbackText="Unknown Sender"
-                        showEncrypted={false}
-                        className="text-muted"
-                      />
-                    );
-                  }
-                })()}
-              </td>
-              <td>
-                <Badge color={getTypeColor(mail.Type)} pill>
-                  {mail.Type}
-                </Badge>
-              </td>
-              <td>{renderStatus(mail)}</td>
-              <td>
-                {mail.assignedTo ? (
-                  <div
-                    onClick={() => handleAssignMail && handleAssignMail(mail)}
-                    style={{ cursor: "pointer" }}
-                    title="Click to reassign"
+            )}
+            <th scope="col">Subject</th>
+            <th scope="col">Sender</th>
+            <th scope="col">Type</th>
+            <th scope="col">Reply Status</th>
+            <th scope="col">Assigned PIC</th>
+            {mailType !== "review" && mailType !== "all" && (
+              <th scope="col">Date</th>
+            )}
+            <th scope="col">{getDeadlineColumnTitle()}</th>
+            {mailType === "review" && <th scope="col">Original Status</th>}
+            <th scope="col" />
+          </tr>
+        </thead>
+        <tbody>
+          {mails.map((mail, index) => {
+            const mailId = mail.id || `${mail.Subject}-${mail.From}`;
+            const isSelected = selectedMails.includes(mailId);
+            // Create unique key using index, fileName and filePath to ensure uniqueness
+            const uniqueKey = `${index}-${mail.fileName || mailId}-${
+              mail.filePath || ""
+            }`.replace(/[^a-zA-Z0-9-_]/g, "-");
+
+            return (
+              <tr key={uniqueKey}>
+                {showCheckboxes && (
+                  <td
+                    style={{
+                      ...stickyCheckboxStyle,
+                      textAlign: "center",
+                      verticalAlign: "middle",
+                    }}
                   >
-                    <div className="text-sm">
-                      {mail.assignedTo.type === "pic" ? (
-                        <span className="font-weight-bold text-primary">
-                          {mail.assignedTo.picName || "Unknown PIC"}
-                        </span>
-                      ) : (
-                        <span className="font-weight-bold text-info">
-                          {mail.assignedTo.groupName || "Unknown Group"}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                ) : (
-                  <Badge
-                    color="secondary"
-                    pill
-                    onClick={() => handleAssignMail && handleAssignMail(mail)}
-                    style={{ cursor: "pointer" }}
-                    title="Click to assign"
-                  >
-                    Unassigned
-                  </Badge>
+                    <Input
+                      type="checkbox"
+                      checked={isSelected}
+                      onChange={(e) =>
+                        onSelectMail && onSelectMail(mailId, e.target.checked)
+                      }
+                      style={{ margin: "0 auto" }}
+                    />
+                  </td>
                 )}
-              </td>
-              {mailType !== "review" && mailType !== "all" && (
-                <td>
-                  <span className="text-sm text-muted">
-                    {formatDate(mail.Date)}
-                  </span>
-                </td>
-              )}
-              <td>{renderReplyDeadline(mail)}</td>
-              {mailType === "review" && (
+                <th scope="row">
+                  <Media className="align-items-center">
+                    <Media>
+                      <span
+                        className="mb-0 text-sm font-weight-bold text-primary cursor-pointer"
+                        onClick={() =>
+                          handleViewDetails && handleViewDetails(mail)
+                        }
+                        style={{ cursor: "pointer" }}
+                        title="Click to view details"
+                      >
+                        {truncateText(mail.Subject, 30)}
+                        {(() => {
+                          // Show NEW icon for DungHan/mustRep unread mails
+                          const shouldShowNew =
+                            mail &&
+                            mail.category === "DungHan" &&
+                            mail.status === "mustRep" &&
+                            !mail.isRead;
+
+                          if (shouldShowNew) {
+                            return (
+                              <Badge
+                                color="danger"
+                                pill
+                                className="ml-2"
+                                style={{
+                                  fontSize: "0.6rem",
+                                  animation: "pulse 2s infinite",
+                                }}
+                              >
+                                NEW
+                              </Badge>
+                            );
+                          }
+                          return null;
+                        })()}
+                      </span>
+                    </Media>
+                  </Media>
+                </th>
                 <td>
                   {(() => {
-                    // Determine original status based on mail data
-                    const getOriginalStatus = (mail) => {
-                      // Check originalCategory first (set when moved to review)
-                      if (mail.originalCategory) {
-                        if (mail.originalCategory === "DungHan") {
-                          return { text: "Valid", color: "success" };
-                        } else if (mail.originalCategory === "QuaHan") {
-                          return { text: "Expired", color: "danger" };
-                        }
-                      }
-
-                      // Fallback: check current mail properties
-                      if (
-                        mail.isExpired === true ||
-                        mail.category === "QuaHan"
-                      ) {
-                        return { text: "Expired", color: "danger" };
-                      } else if (
-                        mail.isExpired === false ||
-                        mail.category === "DungHan"
-                      ) {
-                        return { text: "Valid", color: "success" };
-                      }
-
-                      // Default fallback
-                      return { text: "Unknown", color: "secondary" };
-                    };
-
-                    const status = getOriginalStatus(mail);
-
-                    return (
-                      <Badge color={status.color} pill>
-                        {status.text}
-                      </Badge>
-                    );
+                    const groupInfo = getGroupInfo(mail.From);
+                    if (groupInfo.isGroup) {
+                      return (
+                        <span
+                          className="font-weight-bold"
+                          title={`Group: ${groupInfo.displayName}`}
+                        >
+                          {truncateText(groupInfo.displayName, 30)}
+                        </span>
+                      );
+                    } else {
+                      return (
+                        <DecryptedSender
+                          encryptedFrom={mail.From}
+                          fallbackText="Unknown Sender"
+                          showEncrypted={false}
+                          className="text-muted"
+                        />
+                      );
+                    }
                   })()}
                 </td>
-              )}
-              <td className="text-right">
-                <UncontrolledDropdown>
-                  <DropdownToggle
-                    className="btn-icon-only text-light"
-                    href="#pablo"
-                    role="button"
-                    size="sm"
-                    color=""
-                    onClick={(e) => e.preventDefault()}
-                  >
-                    <i className="fas fa-ellipsis-v" />
-                  </DropdownToggle>
-                  <DropdownMenu
-                    className="dropdown-menu-arrow mail-actions-dropdown"
-                    right
-                    style={{ zIndex: 1080 }}
-                  >
-                    <DropdownItem
-                      href="#pablo"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        handleViewDetails(mail);
-                      }}
+                <td>
+                  <Badge color={getTypeColor(mail.Type)} pill>
+                    {mail.Type}
+                  </Badge>
+                </td>
+                <td>{renderStatus(mail)}</td>
+                <td>
+                  {mail.assignedTo ? (
+                    <div
+                      onClick={() => handleAssignMail && handleAssignMail(mail)}
+                      style={{ cursor: "pointer" }}
+                      title="Click to reassign"
                     >
-                      Xem chi tiết
-                    </DropdownItem>
-                    <DropdownItem
-                      href="#pablo"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        handleAssignMail(mail);
-                      }}
+                      <div className="text-sm">
+                        {mail.assignedTo.type === "pic" ? (
+                          <span className="font-weight-bold text-primary">
+                            {mail.assignedTo.picName || "Unknown PIC"}
+                          </span>
+                        ) : (
+                          <span className="font-weight-bold text-info">
+                            {mail.assignedTo.groupName || "Unknown Group"}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  ) : (
+                    <Badge
+                      color="secondary"
+                      pill
+                      onClick={() => handleAssignMail && handleAssignMail(mail)}
+                      style={{ cursor: "pointer" }}
+                      title="Click to assign"
                     >
-                      <i className="fas fa-user-plus mr-2" />
-                      Phân công
-                    </DropdownItem>
+                      Unassigned
+                    </Badge>
+                  )}
+                </td>
+                {mailType !== "review" && mailType !== "all" && (
+                  <td>
+                    <span className="text-sm text-muted">
+                      {formatDate(mail.Date)}
+                    </span>
+                  </td>
+                )}
+                <td>{renderReplyDeadline(mail)}</td>
+                {mailType === "review" && (
+                  <td>
                     {(() => {
-                      const shouldShowMoveToReview =
-                        (mailType === "valid" || mailType === "expired") &&
-                        handleMoveToReview &&
-                        mail.Subject &&
-                        mail.From;
+                      // Determine original status based on mail data
+                      const getOriginalStatus = (mail) => {
+                        // Check originalCategory first (set when moved to review)
+                        if (mail.originalCategory) {
+                          if (mail.originalCategory === "DungHan") {
+                            return { text: "Valid", color: "success" };
+                          } else if (mail.originalCategory === "QuaHan") {
+                            return { text: "Expired", color: "danger" };
+                          }
+                        }
 
-                      console.log("🔍 Move to Review button check:", {
-                        mailType,
-                        hasHandler: !!handleMoveToReview,
-                        hasSubject: !!mail.Subject,
-                        hasFrom: !!mail.From,
-                        shouldShow: shouldShowMoveToReview,
-                        mailId: mail.id,
-                      });
+                        // Fallback: check current mail properties
+                        if (
+                          mail.isExpired === true ||
+                          mail.category === "QuaHan"
+                        ) {
+                          return { text: "Expired", color: "danger" };
+                        } else if (
+                          mail.isExpired === false ||
+                          mail.category === "DungHan"
+                        ) {
+                          return { text: "Valid", color: "success" };
+                        }
 
-                      return shouldShowMoveToReview ? (
-                        <DropdownItem
-                          href="#pablo"
-                          onClick={(e) => {
-                            e.preventDefault();
-                            console.log(
-                              "🔄 Move to Review clicked for mail:",
-                              mail.Subject
-                            );
-                            console.log("📧 Mail data:", mail);
-                            console.log(
-                              "🎯 handleMoveToReview function:",
-                              typeof handleMoveToReview
-                            );
-                            try {
-                              handleMoveToReview(mail);
-                            } catch (error) {
-                              console.error(
-                                "❌ Error in handleMoveToReview:",
-                                error
-                              );
-                            }
-                          }}
-                        >
-                          <i className="fas fa-arrow-down mr-2" />
-                          Move to Review
-                        </DropdownItem>
-                      ) : null;
+                        // Default fallback
+                        return { text: "Unknown", color: "secondary" };
+                      };
+
+                      const status = getOriginalStatus(mail);
+
+                      return (
+                        <Badge color={status.color} pill>
+                          {status.text}
+                        </Badge>
+                      );
                     })()}
-                    {mailType === "review" && handleMoveBack && (
+                  </td>
+                )}
+                <td className="text-right">
+                  <UncontrolledDropdown>
+                    <DropdownToggle
+                      className="btn-icon-only text-light"
+                      href="#pablo"
+                      role="button"
+                      size="sm"
+                      color=""
+                      onClick={(e) => e.preventDefault()}
+                    >
+                      <i className="fas fa-ellipsis-v" />
+                    </DropdownToggle>
+                    <DropdownMenu
+                      className="dropdown-menu-arrow mail-actions-dropdown"
+                      right
+                      style={{ zIndex: 1080 }}
+                    >
                       <DropdownItem
                         href="#pablo"
                         onClick={(e) => {
                           e.preventDefault();
-                          handleMoveBack(mail);
+                          handleViewDetails(mail);
                         }}
                       >
-                        <i className="fas fa-arrow-up mr-2" />
-                        Move Back
+                        Xem chi tiết
                       </DropdownItem>
-                    )}
-                  </DropdownMenu>
-                </UncontrolledDropdown>
-              </td>
-            </tr>
-          );
-        })}
-      </tbody>
-    </Table>
+                      <DropdownItem
+                        href="#pablo"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          handleAssignMail(mail);
+                        }}
+                      >
+                        <i className="fas fa-user-plus mr-2" />
+                        Phân công
+                      </DropdownItem>
+                      {(() => {
+                        const shouldShowMoveToReview =
+                          (mailType === "valid" || mailType === "expired") &&
+                          handleMoveToReview &&
+                          mail.Subject &&
+                          mail.From;
+
+                        console.log("🔍 Move to Review button check:", {
+                          mailType,
+                          hasHandler: !!handleMoveToReview,
+                          hasSubject: !!mail.Subject,
+                          hasFrom: !!mail.From,
+                          shouldShow: shouldShowMoveToReview,
+                          mailId: mail.id,
+                        });
+
+                        return shouldShowMoveToReview ? (
+                          <DropdownItem
+                            href="#pablo"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              console.log(
+                                "🔄 Move to Review clicked for mail:",
+                                mail.Subject
+                              );
+                              console.log("📧 Mail data:", mail);
+                              console.log(
+                                "🎯 handleMoveToReview function:",
+                                typeof handleMoveToReview
+                              );
+                              try {
+                                handleMoveToReview(mail);
+                              } catch (error) {
+                                console.error(
+                                  "❌ Error in handleMoveToReview:",
+                                  error
+                                );
+                              }
+                            }}
+                          >
+                            <i className="fas fa-arrow-down mr-2" />
+                            Move to Review
+                          </DropdownItem>
+                        ) : null;
+                      })()}
+                      {mailType === "review" && handleMoveBack && (
+                        <DropdownItem
+                          href="#pablo"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            handleMoveBack(mail);
+                          }}
+                        >
+                          <i className="fas fa-arrow-up mr-2" />
+                          Move Back
+                        </DropdownItem>
+                      )}
+                    </DropdownMenu>
+                  </UncontrolledDropdown>
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </Table>
     </div>
   );
 };

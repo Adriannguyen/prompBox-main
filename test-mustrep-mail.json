@@ -1,9 +1,9 @@
 {
-    "Subject": "Test Mail - mustRep folder",
-    "From": "test@example.com",
-    "Type": "To", 
-    "Date": ["2025-10-01", "14:30"],
-    "SummaryContent": "Test mail for mustRep logic testing",
-    "isRead": "false",
-    "id": "test-mustrep-001"
+  "Subject": "Test Mail - mustRep folder",
+  "From": "test@example.com",
+  "Type": "To",
+  "Date": ["2025-10-01", "14:30"],
+  "SummaryContent": "Test mail for mustRep logic testing",
+  "isRead": "false",
+  "id": "test-mustrep-001"
 }

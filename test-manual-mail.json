@@ -2,10 +2,7 @@
   "Subject": "Manual Test Mail for Auto Assignment",
   "From": "admin@company.com",
   "Type": "To",
-  "Date": [
-    "2024-10-02",
-    "14:30"
-  ],
+  "Date": ["2024-10-02", "14:30"],
   "SummaryContent": "This is a test mail created manually to test auto-assignment when copying files directly to the folder",
   "id": "manual-test-1759424301893",
   "isRead": false

@@ -81,7 +81,7 @@ const readJsonFile = (filePath) => {
     return JSON.parse(data);
   } catch (error) {
     // Only log as error if it's not a file not found error
-    if (error.code === 'ENOENT') {
+    if (error.code === "ENOENT") {
       console.warn(`⚠️  File not found (possibly moved): ${filePath}`);
     } else {
       console.error(`❌ Error reading file ${filePath}:`, error.message);
@@ -138,14 +138,19 @@ const getReplyStatusFromFolder = (filePath, category, status) => {
   } else if (category === "ReviewMail") {
     return status === "processed"; // ReviewMail/processed = replied, ReviewMail/pending = not replied
   }
-  
+
   // Fallback: analyze filePath if category/status not available
   if (filePath) {
-    return filePath.includes("/rep/") || filePath.includes("\\rep\\") || 
-           filePath.includes("/daRep/") || filePath.includes("\\daRep\\") ||
-           filePath.includes("/processed/") || filePath.includes("\\processed\\");
+    return (
+      filePath.includes("/rep/") ||
+      filePath.includes("\\rep\\") ||
+      filePath.includes("/daRep/") ||
+      filePath.includes("\\daRep\\") ||
+      filePath.includes("/processed/") ||
+      filePath.includes("\\processed\\")
+    );
   }
-  
+
   return false; // Default to not replied
 };
 
@@ -157,19 +162,30 @@ const autoAssignMailToLeaderPIC = (mailData, mailFilePath) => {
     }
 
     // Try different possible field names for sender email
-    const senderEmail = mailData.from || mailData.sender || mailData.from_email || mailData.email;
-    
-    console.log(`🔍 Checking mail ${path.basename(mailFilePath)}: senderEmail=${senderEmail}`);
-    
+    const senderEmail =
+      mailData.from || mailData.sender || mailData.from_email || mailData.email;
+
+    console.log(
+      `🔍 Checking mail ${path.basename(
+        mailFilePath
+      )}: senderEmail=${senderEmail}`
+    );
+
     if (!senderEmail) {
-      const availableKeys = Object.keys(mailData).slice(0, 5).join(', '); // Limit to first 5 keys
-      return { success: false, error: `No sender email found. Available fields: ${availableKeys}...` };
+      const availableKeys = Object.keys(mailData).slice(0, 5).join(", "); // Limit to first 5 keys
+      return {
+        success: false,
+        error: `No sender email found. Available fields: ${availableKeys}...`,
+      };
     }
 
-    const senderDomain = senderEmail.split('@')[1]?.toLowerCase();
-    
+    const senderDomain = senderEmail.split("@")[1]?.toLowerCase();
+
     if (!senderDomain) {
-      return { success: false, error: `Invalid sender email format: ${senderEmail}` };
+      return {
+        success: false,
+        error: `Invalid sender email format: ${senderEmail}`,
+      };
     }
 
     // Load groups
@@ -178,17 +194,22 @@ const autoAssignMailToLeaderPIC = (mailData, mailFilePath) => {
       return { success: false, error: "No groups directory found" };
     }
 
-    const groupFiles = fs.readdirSync(groupsPath).filter(file => file.endsWith('.json'));
+    const groupFiles = fs
+      .readdirSync(groupsPath)
+      .filter((file) => file.endsWith(".json"));
     let matchingGroup = null;
 
     // Find group with matching domain
     for (const groupFile of groupFiles) {
       const groupPath = path.join(groupsPath, groupFile);
       const groupData = readJsonFile(groupPath);
-      
+
       if (groupData && groupData.domains && Array.isArray(groupData.domains)) {
         for (const domain of groupData.domains) {
-          if (senderDomain.includes(domain.toLowerCase()) || domain.toLowerCase().includes(senderDomain)) {
+          if (
+            senderDomain.includes(domain.toLowerCase()) ||
+            domain.toLowerCase().includes(senderDomain)
+          ) {
             matchingGroup = groupData;
             break;
           }
@@ -198,7 +219,10 @@ const autoAssignMailToLeaderPIC = (mailData, mailFilePath) => {
     }
 
     if (!matchingGroup) {
-      return { success: false, error: `No group found for domain: ${senderDomain}` };
+      return {
+        success: false,
+        error: `No group found for domain: ${senderDomain}`,
+      };
     }
 
     // Find leader PIC for the matching group
@@ -207,23 +231,32 @@ const autoAssignMailToLeaderPIC = (mailData, mailFilePath) => {
       return { success: false, error: "No PICs directory found" };
     }
 
-    const picFiles = fs.readdirSync(picsPath).filter(file => file.endsWith('.json'));
+    const picFiles = fs
+      .readdirSync(picsPath)
+      .filter((file) => file.endsWith(".json"));
     let leaderPic = null;
 
     for (const picFile of picFiles) {
       const picPath = path.join(picsPath, picFile);
       const picData = readJsonFile(picPath);
-      
-      if (picData && 
-          picData.groups && picData.groups.includes(matchingGroup.id) &&
-          picData.groupLeaderships && picData.groupLeaderships.includes(matchingGroup.id)) {
+
+      if (
+        picData &&
+        picData.groups &&
+        picData.groups.includes(matchingGroup.id) &&
+        picData.groupLeaderships &&
+        picData.groupLeaderships.includes(matchingGroup.id)
+      ) {
         leaderPic = picData;
         break;
       }
     }
 
     if (!leaderPic) {
-      return { success: false, error: `No leader PIC found for group: ${matchingGroup.name}` };
+      return {
+        success: false,
+        error: `No leader PIC found for group: ${matchingGroup.name}`,
+      };
     }
 
     // Assign mail to leader PIC
@@ -233,25 +266,24 @@ const autoAssignMailToLeaderPIC = (mailData, mailFilePath) => {
       assigned_email: leaderPic.email,
       assigned_at: new Date().toISOString(),
       auto_assigned: true,
-      assignment_reason: `Auto-assigned based on sender domain: ${senderDomain}`
+      assignment_reason: `Auto-assigned based on sender domain: ${senderDomain}`,
     };
 
     // Save updated mail
     if (writeJsonFile(mailFilePath, updatedMail)) {
-      return { 
-        success: true, 
+      return {
+        success: true,
         assignment: {
           picName: leaderPic.name,
           picEmail: leaderPic.email,
           groupName: matchingGroup.name,
           senderEmail,
-          senderDomain
-        }
+          senderDomain,
+        },
       };
     } else {
       return { success: false, error: "Failed to save mail assignment" };
     }
-
   } catch (error) {
     console.error("Error in autoAssignMailToLeaderPIC:", error);
     return { success: false, error: error.message };
@@ -267,22 +299,28 @@ const autoAssignNewMails = () => {
     // Check DungHan/mustRep folder for new unassigned mails
     const mustRepPath = path.join(MAIL_DATA_PATH, "DungHan", "mustRep");
     if (fs.existsSync(mustRepPath)) {
-      const files = fs.readdirSync(mustRepPath).filter(file => file.endsWith('.json'));
-      
+      const files = fs
+        .readdirSync(mustRepPath)
+        .filter((file) => file.endsWith(".json"));
+
       for (const file of files) {
         const filePath = path.join(mustRepPath, file);
         const mailData = readJsonFile(filePath);
-        
+
         // Only auto-assign if not already assigned
         if (mailData && !mailData.assigned_to && !mailData.auto_assigned) {
           const result = autoAssignMailToLeaderPIC(mailData, filePath);
           results.push({ file, ...result });
-          
+
           if (result.success) {
             assignedCount++;
-            console.log(`✅ Auto-assigned mail ${file} to ${result.assignment.picName} (${result.assignment.groupName})`);
+            console.log(
+              `✅ Auto-assigned mail ${file} to ${result.assignment.picName} (${result.assignment.groupName})`
+            );
           } else {
-            console.log(`❌ Failed to auto-assign mail ${file}: ${result.error}`);
+            console.log(
+              `❌ Failed to auto-assign mail ${file}: ${result.error}`
+            );
           }
         }
       }
@@ -308,9 +346,9 @@ const autoAssignAllUnassignedMails = () => {
     // Check all mail folders for unassigned mails
     const foldersToCheck = [
       "DungHan/mustRep",
-      "DungHan/rep", 
+      "DungHan/rep",
       "QuaHan/chuaRep",
-      "QuaHan/daRep"
+      "QuaHan/daRep",
     ];
 
     for (const folder of foldersToCheck) {
@@ -320,41 +358,62 @@ const autoAssignAllUnassignedMails = () => {
         continue;
       }
 
-      const files = fs.readdirSync(folderPath).filter(file => file.endsWith('.json')).slice(0, maxFiles);
+      const files = fs
+        .readdirSync(folderPath)
+        .filter((file) => file.endsWith(".json"))
+        .slice(0, maxFiles);
       console.log(`📁 Processing ${files.length} files in ${folder}`);
-      
+
       for (const file of files) {
         try {
           const filePath = path.join(folderPath, file);
           const mailData = readJsonFile(filePath);
           totalChecked++;
-          
+
           // Auto-assign if not already assigned
           if (mailData && !mailData.assigned_to) {
             const result = autoAssignMailToLeaderPIC(mailData, filePath);
             results.push({ file, folder, ...result });
-            
+
             if (result.success) {
               assignedCount++;
-              console.log(`✅ Auto-assigned mail ${file} (${folder}) to ${result.assignment.picName} (${result.assignment.groupName})`);
+              console.log(
+                `✅ Auto-assigned mail ${file} (${folder}) to ${result.assignment.picName} (${result.assignment.groupName})`
+              );
             } else {
-              console.log(`❌ Failed to auto-assign mail ${file} (${folder}): ${result.error}`);
+              console.log(
+                `❌ Failed to auto-assign mail ${file} (${folder}): ${result.error}`
+              );
             }
           } else if (mailData && mailData.assigned_to) {
-            console.log(`ℹ️ Mail ${file} already assigned to ${mailData.assigned_to}`);
+            console.log(
+              `ℹ️ Mail ${file} already assigned to ${mailData.assigned_to}`
+            );
           }
         } catch (fileError) {
           console.error(`❌ Error processing file ${file}:`, fileError.message);
-          results.push({ file, folder, success: false, error: fileError.message });
+          results.push({
+            file,
+            folder,
+            success: false,
+            error: fileError.message,
+          });
         }
       }
     }
 
-    console.log(`🎯 Auto-assignment complete: ${assignedCount}/${totalChecked} mails assigned`);
+    console.log(
+      `🎯 Auto-assignment complete: ${assignedCount}/${totalChecked} mails assigned`
+    );
     return { assignedCount, totalChecked, results };
   } catch (error) {
     console.error("Error in autoAssignAllUnassignedMails:", error);
-    return { assignedCount: 0, totalChecked: 0, results: [], error: error.message };
+    return {
+      assignedCount: 0,
+      totalChecked: 0,
+      results: [],
+      error: error.message,
+    };
   }
 };
 
@@ -405,7 +464,7 @@ const userExists = (username) => {
 
 const saveUser = (userData) => {
   createUserDirectory();
-  
+
   const userRecord = {
     id: userData.id || Date.now().toString(),
     username: userData.username,
@@ -420,7 +479,7 @@ const saveUser = (userData) => {
   };
 
   const userFilePath = path.join(USER_DATA_PATH, `${userRecord.id}.json`);
-  
+
   try {
     fs.writeFileSync(userFilePath, JSON.stringify(userRecord, null, 2));
     console.log(`✅ User saved: ${userData.username}`);
@@ -587,17 +646,22 @@ const checkForNewMails = () => {
         try {
           const autoAssignResult = autoAssignNewMails();
           if (autoAssignResult && autoAssignResult.assignedCount > 0) {
-            console.log(`🎯 Auto-assigned ${autoAssignResult.assignedCount} mail(s) to leader PICs`);
-            
+            console.log(
+              `🎯 Auto-assigned ${autoAssignResult.assignedCount} mail(s) to leader PICs`
+            );
+
             // Broadcast auto-assignment notification
             broadcastToClients("autoAssignmentCompleted", {
               assignedCount: autoAssignResult.assignedCount,
               results: autoAssignResult.results,
-              timestamp: new Date()
+              timestamp: new Date(),
             });
           }
         } catch (autoAssignError) {
-          console.error("❌ Error in auto-assignment (non-fatal):", autoAssignError.message);
+          console.error(
+            "❌ Error in auto-assignment (non-fatal):",
+            autoAssignError.message
+          );
         }
 
         // Notify clients about new mails but don't trigger auto-reload
@@ -605,7 +669,7 @@ const checkForNewMails = () => {
           count: newStats.newMails,
           timestamp: new Date(),
           shouldReload: false,
-          autoAssigned: 0 // Safe fallback
+          autoAssigned: 0, // Safe fallback
         });
       }
     }
@@ -656,27 +720,32 @@ const autoAssignLeaderBySenderGroup = (mailData, filePath = null) => {
 
   try {
     const groupsPath = path.join(ASSIGNMENT_DATA_PATH, "Groups");
-    
+
     if (!fs.existsSync(groupsPath)) {
       return mailData;
     }
 
-    const groupFiles = fs.readdirSync(groupsPath).filter((f) => f.endsWith(".json"));
-    
+    const groupFiles = fs
+      .readdirSync(groupsPath)
+      .filter((f) => f.endsWith(".json"));
+
     // Find group that contains sender email
     for (const file of groupFiles) {
       const groupData = readJsonFile(path.join(groupsPath, file));
       if (!groupData || !groupData.members) continue;
-      
+
       // Check if sender email is in this group's members
       const senderEmail = mailData.From || mailData.EncryptedFrom;
-      const isInGroup = groupData.members.some(member => 
-        member.toLowerCase().trim() === senderEmail.toLowerCase().trim()
+      const isInGroup = groupData.members.some(
+        (member) =>
+          member.toLowerCase().trim() === senderEmail.toLowerCase().trim()
       );
-      
+
       if (isInGroup && groupData.pic && groupData.picEmail) {
-        console.log(`🎯 Auto-assigning mail from ${senderEmail} to group leader: ${groupData.pic} (${groupData.picEmail})`);
-        
+        console.log(
+          `🎯 Auto-assigning mail from ${senderEmail} to group leader: ${groupData.pic} (${groupData.picEmail})`
+        );
+
         const updatedMailData = {
           ...mailData,
           assignedTo: {
@@ -687,8 +756,8 @@ const autoAssignLeaderBySenderGroup = (mailData, filePath = null) => {
             assignedAt: new Date().toISOString(),
             assignedBy: "system_auto", // Mark as system auto-assignment
             groupId: path.parse(file).name,
-            groupName: groupData.name
-          }
+            groupName: groupData.name,
+          },
         };
 
         // Save updated mail data back to file if filePath provided
@@ -698,13 +767,15 @@ const autoAssignLeaderBySenderGroup = (mailData, filePath = null) => {
             if (success) {
               console.log(`💾 Saved auto-assigned mail data to ${filePath}`);
             } else {
-              console.error(`❌ Failed to save auto-assigned mail data to ${filePath}`);
+              console.error(
+                `❌ Failed to save auto-assigned mail data to ${filePath}`
+              );
             }
           } catch (saveError) {
             console.error("❌ Error saving auto-assigned mail:", saveError);
           }
         }
-        
+
         return updatedMailData;
       }
     }
@@ -719,7 +790,7 @@ const autoAssignLeaderBySenderGroup = (mailData, filePath = null) => {
 const enrichMailWithAssignmentInfo = (mailData, filePath = null) => {
   // First try auto-assign if not already assigned
   let enrichedMail = autoAssignLeaderBySenderGroup(mailData, filePath);
-  
+
   if (!enrichedMail.assignedTo) {
     return enrichedMail;
   }
@@ -728,7 +799,10 @@ const enrichMailWithAssignmentInfo = (mailData, filePath = null) => {
 
   try {
     // If assigned to PIC, get PIC name (may already be populated by auto-assign)
-    if (enrichedMail.assignedTo.type === "pic" && enrichedMail.assignedTo.picId) {
+    if (
+      enrichedMail.assignedTo.type === "pic" &&
+      enrichedMail.assignedTo.picId
+    ) {
       if (!enrichedMail.assignedTo.picName) {
         const picsPath = path.join(ASSIGNMENT_DATA_PATH, "PIC");
         const picFileName = `${enrichedMail.assignedTo.picId}.json`;
@@ -745,7 +819,10 @@ const enrichMailWithAssignmentInfo = (mailData, filePath = null) => {
     }
 
     // If assigned to Group, get Group name (may already be populated by auto-assign)
-    if (enrichedMail.assignedTo.type === "group" && enrichedMail.assignedTo.groupId) {
+    if (
+      enrichedMail.assignedTo.type === "group" &&
+      enrichedMail.assignedTo.groupId
+    ) {
       if (!enrichedMail.assignedTo.groupName) {
         const groupsPath = path.join(ASSIGNMENT_DATA_PATH, "Groups");
         const groupFileName = `${enrichedMail.assignedTo.groupId}.json`;
@@ -783,7 +860,10 @@ const loadAllMails = () => {
         const mailData = readJsonFile(filePath);
         if (mailData) {
           const decryptedMail = decryptMailFrom(mailData); // Decrypt here
-          const enrichedMail = enrichMailWithAssignmentInfo(decryptedMail, filePath);
+          const enrichedMail = enrichMailWithAssignmentInfo(
+            decryptedMail,
+            filePath
+          );
           allMails.push({
             id: enrichedMail.id || path.parse(file).name || fileId++,
             fileName: file,
@@ -809,7 +889,10 @@ const loadAllMails = () => {
         const mailData = readJsonFile(filePath);
         if (mailData) {
           const decryptedMail = decryptMailFrom(mailData); // Decrypt here
-          const enrichedMail = enrichMailWithAssignmentInfo(decryptedMail, filePath);
+          const enrichedMail = enrichMailWithAssignmentInfo(
+            decryptedMail,
+            filePath
+          );
           allMails.push({
             id: enrichedMail.id || path.parse(file).name || fileId++,
             fileName: file,
@@ -835,7 +918,10 @@ const loadAllMails = () => {
         const mailData = readJsonFile(filePath);
         if (mailData) {
           const decryptedMail = decryptMailFrom(mailData); // Decrypt here
-          const enrichedMail = enrichMailWithAssignmentInfo(decryptedMail, filePath);
+          const enrichedMail = enrichMailWithAssignmentInfo(
+            decryptedMail,
+            filePath
+          );
           allMails.push({
             id: enrichedMail.id || path.parse(file).name || fileId++,
             fileName: file,
@@ -861,7 +947,10 @@ const loadAllMails = () => {
         const mailData = readJsonFile(filePath);
         if (mailData) {
           const decryptedMail = decryptMailFrom(mailData); // Decrypt here
-          const enrichedMail = enrichMailWithAssignmentInfo(decryptedMail, filePath);
+          const enrichedMail = enrichMailWithAssignmentInfo(
+            decryptedMail,
+            filePath
+          );
           allMails.push({
             id: enrichedMail.id || path.parse(file).name || fileId++,
             fileName: file,
@@ -877,7 +966,10 @@ const loadAllMails = () => {
     }
 
     // Load ReviewMail - pending (under review)
-    const reviewMailPendingPath = path.join(MAIL_DATA_PATH, "ReviewMail/pending");
+    const reviewMailPendingPath = path.join(
+      MAIL_DATA_PATH,
+      "ReviewMail/pending"
+    );
     if (fs.existsSync(reviewMailPendingPath)) {
       const files = fs
         .readdirSync(reviewMailPendingPath)
@@ -887,8 +979,12 @@ const loadAllMails = () => {
         const mailData = readJsonFile(filePath);
         if (mailData) {
           const decryptedMail = decryptMailFrom(mailData);
-          const enrichedMail = enrichMailWithAssignmentInfo(decryptedMail, filePath);
-          const mailId = mailData.id || enrichedMail.id || path.parse(file).name || fileId++;
+          const enrichedMail = enrichMailWithAssignmentInfo(
+            decryptedMail,
+            filePath
+          );
+          const mailId =
+            mailData.id || enrichedMail.id || path.parse(file).name || fileId++;
 
           // Status determined from folder path - no need to add status field
           // Frontend will determine status from filePath
@@ -900,17 +996,26 @@ const loadAllMails = () => {
             category: "ReviewMail",
             // status: determined from folder path in frontend
             isExpired: false,
-            isReplied: getReplyStatusFromFolder(filePath, "ReviewMail", "pending"),
+            isReplied: getReplyStatusFromFolder(
+              filePath,
+              "ReviewMail",
+              "pending"
+            ),
             ...enrichedMail,
           });
 
-          console.log(`[Debug] Loaded ReviewMail/pending: id=${mailId}, file=${file}`);
+          console.log(
+            `[Debug] Loaded ReviewMail/pending: id=${mailId}, file=${file}`
+          );
         }
       });
     }
 
     // Load ReviewMail - processed (completed review)
-    const reviewMailProcessedPath = path.join(MAIL_DATA_PATH, "ReviewMail/processed");
+    const reviewMailProcessedPath = path.join(
+      MAIL_DATA_PATH,
+      "ReviewMail/processed"
+    );
     if (fs.existsSync(reviewMailProcessedPath)) {
       const files = fs
         .readdirSync(reviewMailProcessedPath)
@@ -920,8 +1025,12 @@ const loadAllMails = () => {
         const mailData = readJsonFile(filePath);
         if (mailData) {
           const decryptedMail = decryptMailFrom(mailData);
-          const enrichedMail = enrichMailWithAssignmentInfo(decryptedMail, filePath);
-          const mailId = mailData.id || enrichedMail.id || path.parse(file).name || fileId++;
+          const enrichedMail = enrichMailWithAssignmentInfo(
+            decryptedMail,
+            filePath
+          );
+          const mailId =
+            mailData.id || enrichedMail.id || path.parse(file).name || fileId++;
 
           // Status determined from folder path - no need to add status field
           // Frontend will determine status from filePath
@@ -933,11 +1042,17 @@ const loadAllMails = () => {
             category: "ReviewMail",
             // status: determined from folder path in frontend
             isExpired: false,
-            isReplied: getReplyStatusFromFolder(filePath, "ReviewMail", "processed"),
+            isReplied: getReplyStatusFromFolder(
+              filePath,
+              "ReviewMail",
+              "processed"
+            ),
             ...enrichedMail,
           });
 
-          console.log(`[Debug] Loaded ReviewMail/processed: id=${mailId}, file=${file}`);
+          console.log(
+            `[Debug] Loaded ReviewMail/processed: id=${mailId}, file=${file}`
+          );
         }
       });
     }
@@ -947,24 +1062,39 @@ const loadAllMails = () => {
     if (fs.existsSync(reviewMailPath)) {
       const files = fs
         .readdirSync(reviewMailPath)
-        .filter((f) => f.endsWith(".json") && !fs.statSync(path.join(reviewMailPath, f)).isDirectory());
-      
+        .filter(
+          (f) =>
+            f.endsWith(".json") &&
+            !fs.statSync(path.join(reviewMailPath, f)).isDirectory()
+        );
+
       if (files.length > 0) {
-        console.log(`⚠️ Found ${files.length} legacy ReviewMail files, auto-migrating to folder structure...`);
+        console.log(
+          `⚠️ Found ${files.length} legacy ReviewMail files, auto-migrating to folder structure...`
+        );
       }
-      
+
       files.forEach((file) => {
         const filePath = path.join(reviewMailPath, file);
         const mailData = readJsonFile(filePath);
         if (mailData) {
           const decryptedMail = decryptMailFrom(mailData);
-          const enrichedMail = enrichMailWithAssignmentInfo(decryptedMail, filePath);
-          const mailId = mailData.id || enrichedMail.id || path.parse(file).name || fileId++;
+          const enrichedMail = enrichMailWithAssignmentInfo(
+            decryptedMail,
+            filePath
+          );
+          const mailId =
+            mailData.id || enrichedMail.id || path.parse(file).name || fileId++;
 
           // Determine target subfolder based on existing isReplied field
-          const isReplied = mailData.isReplied !== undefined ? mailData.isReplied : false;
+          const isReplied =
+            mailData.isReplied !== undefined ? mailData.isReplied : false;
           const targetStatus = isReplied ? "processed" : "pending";
-          const targetFolderPath = path.join(MAIL_DATA_PATH, "ReviewMail", targetStatus);
+          const targetFolderPath = path.join(
+            MAIL_DATA_PATH,
+            "ReviewMail",
+            targetStatus
+          );
           const targetFilePath = path.join(targetFolderPath, file);
 
           // Create target folder if it doesn't exist
@@ -985,7 +1115,11 @@ const loadAllMails = () => {
               category: "ReviewMail",
               status: targetStatus,
               isExpired: false,
-              isReplied: getReplyStatusFromFolder(targetFilePath, "ReviewMail", targetStatus),
+              isReplied: getReplyStatusFromFolder(
+                targetFilePath,
+                "ReviewMail",
+                targetStatus
+              ),
               ...enrichedMail,
             });
           }
@@ -1031,43 +1165,56 @@ app.put("/api/mails/:id/status", (req, res) => {
 
     // Log first few mails for debugging
     allMails.slice(0, 3).forEach((m, index) => {
-      console.log(`[Debug] Mail ${index}: id=${m.id}, fileName=${m.fileName}, category=${m.category}`);
+      console.log(
+        `[Debug] Mail ${index}: id=${m.id}, fileName=${m.fileName}, category=${m.category}`
+      );
     });
 
-    const mail = allMails.find((m) =>
-      m.id === id ||
-      m.id === parseInt(id) ||
-      path.parse(m.fileName).name === id ||
-      m.fileName === `${id}.json`
+    const mail = allMails.find(
+      (m) =>
+        m.id === id ||
+        m.id === parseInt(id) ||
+        path.parse(m.fileName).name === id ||
+        m.fileName === `${id}.json`
     );
 
     if (!mail) {
       console.log(`[Debug] Mail not found with ID: ${id}`);
-      console.log(`[Debug] Available mail IDs: ${allMails.map(m => m.id).join(', ')}`);
+      console.log(
+        `[Debug] Available mail IDs: ${allMails.map((m) => m.id).join(", ")}`
+      );
       return res.status(404).json({
         success: false,
         error: "Mail not found",
       });
     }
 
-    console.log(`[Debug] Found mail: ${mail.Subject}, filePath: ${mail.filePath}, category: ${mail.category}`);
+    console.log(
+      `[Debug] Found mail: ${mail.Subject}, filePath: ${mail.filePath}, category: ${mail.category}`
+    );
 
     // Read the current mail file
     let mailData = readJsonFile(mail.filePath);
 
     // If file not found at expected path, try to find it in other folders
     if (!mailData) {
-      console.log(`[Debug] File not found at ${mail.filePath}, searching in other folders...`);
+      console.log(
+        `[Debug] File not found at ${mail.filePath}, searching in other folders...`
+      );
 
       const searchFolders = [
         "DungHan/mustRep",
         "QuaHan/chuaRep",
         "QuaHan/daRep",
-        "ReviewMail"
+        "ReviewMail",
       ];
 
       for (const folder of searchFolders) {
-        const alternativePath = path.join(MAIL_DATA_PATH, folder, mail.fileName);
+        const alternativePath = path.join(
+          MAIL_DATA_PATH,
+          folder,
+          mail.fileName
+        );
         console.log(`[Debug] Trying: ${alternativePath}`);
 
         if (fs.existsSync(alternativePath)) {
@@ -1090,30 +1237,35 @@ app.put("/api/mails/:id/status", (req, res) => {
     }
 
     // Update reply status by moving file to appropriate folder
-    const currentCategory = mail.category === "ReviewMail" ? 
-      (mail.originalCategory || "DungHan") : mail.category;
-    const newStatus = getFolderStatusFromReply(currentCategory, Boolean(isReplied));
-    
+    const currentCategory =
+      mail.category === "ReviewMail"
+        ? mail.originalCategory || "DungHan"
+        : mail.category;
+    const newStatus = getFolderStatusFromReply(
+      currentCategory,
+      Boolean(isReplied)
+    );
+
     // Determine source and destination paths
     const oldFilePath = mail.filePath;
     const fileName = mail.fileName;
     const newFolderPath = path.join(MAIL_DATA_PATH, currentCategory, newStatus);
     const newFilePath = path.join(newFolderPath, fileName);
-    
+
     console.log(`📁 Moving file from ${oldFilePath} to ${newFilePath}`);
-    
+
     // Ensure destination folder exists
     if (!fs.existsSync(newFolderPath)) {
       fs.mkdirSync(newFolderPath, { recursive: true });
       console.log(`📁 Created directory: ${newFolderPath}`);
     }
-    
+
     // Update mail data with new status and path
     mailData.isReplied = Boolean(isReplied);
     mailData.status = newStatus;
     mailData.category = currentCategory;
     mailData.filePath = newFilePath;
-    
+
     // Write to new location
     if (writeJsonFile(newFilePath, mailData)) {
       // Remove from old location if different
@@ -1121,7 +1273,7 @@ app.put("/api/mails/:id/status", (req, res) => {
         fs.unlinkSync(oldFilePath);
         console.log(`🗑️ Removed old file: ${oldFilePath}`);
       }
-      
+
       console.log(
         `✅ Updated mail status and moved file: ${mail.Subject} -> isReplied: ${isReplied}, moved to ${newStatus} folder`
       );
@@ -1211,9 +1363,11 @@ app.post("/api/simulate-new-mail", (req, res) => {
 
   if (writeJsonFile(filePath, mailData)) {
     console.log(`📧 Simulated new mail created: ${fileName}`);
-    
+
     if (mailData.assignedTo) {
-      console.log(`✅ Mail auto-assigned to: ${mailData.assignedTo.picName} (${mailData.assignedTo.picEmail})`);
+      console.log(
+        `✅ Mail auto-assigned to: ${mailData.assignedTo.picName} (${mailData.assignedTo.picEmail})`
+      );
     } else {
       console.log(`ℹ️ No auto-assignment found for sender: ${from}`);
     }
@@ -1225,9 +1379,9 @@ app.post("/api/simulate-new-mail", (req, res) => {
       broadcastToClients("mailCreated", {
         mail: mailData,
         fileName: fileName,
-        category: "DungHan", 
+        category: "DungHan",
         status: "mustRep",
-        timestamp: new Date()
+        timestamp: new Date(),
       });
     }, 500);
 
@@ -1302,24 +1456,33 @@ watcher
         try {
           let mailData = readJsonFile(filePath);
           if (mailData && !mailData.assignedTo) {
-            console.log(`🎯 Auto-assigning leader for new mail from: ${mailData.From}`);
-            
+            console.log(
+              `🎯 Auto-assigning leader for new mail from: ${mailData.From}`
+            );
+
             // Use the existing auto-assignment function
-            const updatedMailData = autoAssignLeaderBySenderGroup(mailData, filePath);
-            
+            const updatedMailData = autoAssignLeaderBySenderGroup(
+              mailData,
+              filePath
+            );
+
             if (updatedMailData.assignedTo) {
-              console.log(`✅ Mail auto-assigned to: ${updatedMailData.assignedTo.picName} (${updatedMailData.assignedTo.picEmail})`);
-              
+              console.log(
+                `✅ Mail auto-assigned to: ${updatedMailData.assignedTo.picName} (${updatedMailData.assignedTo.picEmail})`
+              );
+
               // Broadcast update to connected clients
               broadcastToClients("mailAssigned", {
                 mail: updatedMailData,
                 fileName: path.basename(filePath),
                 category: "DungHan",
                 status: "mustRep",
-                timestamp: new Date()
+                timestamp: new Date(),
               });
             } else {
-              console.log(`ℹ️ No auto-assignment found for sender: ${mailData.From}`);
+              console.log(
+                `ℹ️ No auto-assignment found for sender: ${mailData.From}`
+              );
             }
           }
         } catch (error) {
@@ -1330,31 +1493,45 @@ watcher
         }
         checkForNewMails();
       }, 1000);
-    } else if (filePath.endsWith(".json") && filePath.includes("QuaHan\\mustRep")) {
-      console.log(`📁 New expired mail file detected: ${path.basename(filePath)}`);
+    } else if (
+      filePath.endsWith(".json") &&
+      filePath.includes("QuaHan\\mustRep")
+    ) {
+      console.log(
+        `📁 New expired mail file detected: ${path.basename(filePath)}`
+      );
 
       setTimeout(() => {
         try {
           let mailData = readJsonFile(filePath);
           if (mailData && !mailData.assignedTo) {
-            console.log(`🎯 Auto-assigning leader for new expired mail from: ${mailData.From}`);
-            
+            console.log(
+              `🎯 Auto-assigning leader for new expired mail from: ${mailData.From}`
+            );
+
             // Use the existing auto-assignment function
-            const updatedMailData = autoAssignLeaderBySenderGroup(mailData, filePath);
-            
+            const updatedMailData = autoAssignLeaderBySenderGroup(
+              mailData,
+              filePath
+            );
+
             if (updatedMailData.assignedTo) {
-              console.log(`✅ Expired mail auto-assigned to: ${updatedMailData.assignedTo.picName} (${updatedMailData.assignedTo.picEmail})`);
-              
+              console.log(
+                `✅ Expired mail auto-assigned to: ${updatedMailData.assignedTo.picName} (${updatedMailData.assignedTo.picEmail})`
+              );
+
               // Broadcast update to connected clients
               broadcastToClients("mailAssigned", {
                 mail: updatedMailData,
                 fileName: path.basename(filePath),
                 category: "QuaHan",
                 status: "mustRep",
-                timestamp: new Date()
+                timestamp: new Date(),
               });
             } else {
-              console.log(`ℹ️ No auto-assignment found for expired mail sender: ${mailData.From}`);
+              console.log(
+                `ℹ️ No auto-assignment found for expired mail sender: ${mailData.From}`
+              );
             }
           }
         } catch (error) {
@@ -1670,7 +1847,9 @@ app.post("/api/pics/:picId/groups", (req, res) => {
 
     // Check if PIC is already in the group
     if (picData.groups.includes(groupId)) {
-      return res.status(400).json({ error: "PIC is already assigned to this group" });
+      return res
+        .status(400)
+        .json({ error: "PIC is already assigned to this group" });
     }
 
     // Add group to PIC's groups
@@ -1679,10 +1858,10 @@ app.post("/api/pics/:picId/groups", (req, res) => {
 
     // Save updated PIC data
     if (writeJsonFile(picFilePath, picData)) {
-      res.json({ 
-        success: true, 
+      res.json({
+        success: true,
         message: "PIC added to group successfully",
-        pic: picData 
+        pic: picData,
       });
     } else {
       res.status(500).json({ error: "Failed to update PIC data" });
@@ -1721,7 +1900,9 @@ app.delete("/api/pics/:picId/groups/:groupId", (req, res) => {
     // Check if PIC is in the group
     const groupIndex = picData.groups.indexOf(groupId);
     if (groupIndex === -1) {
-      return res.status(400).json({ error: "PIC is not assigned to this group" });
+      return res
+        .status(400)
+        .json({ error: "PIC is not assigned to this group" });
     }
 
     // Remove group from PIC's groups
@@ -1730,10 +1911,10 @@ app.delete("/api/pics/:picId/groups/:groupId", (req, res) => {
 
     // Save updated PIC data
     if (writeJsonFile(picFilePath, picData)) {
-      res.json({ 
-        success: true, 
+      res.json({
+        success: true,
         message: "PIC removed from group successfully",
-        pic: picData 
+        pic: picData,
       });
     } else {
       res.status(500).json({ error: "Failed to update PIC data" });
@@ -1747,21 +1928,23 @@ app.delete("/api/pics/:picId/groups/:groupId", (req, res) => {
 // Get PICs assigned to a specific group
 app.get("/api/groups/:groupId/pics", (req, res) => {
   const { groupId } = req.params;
-  
+
   try {
     const picsPath = path.join(ASSIGNMENT_DATA_PATH, "PIC");
-    
+
     if (!fs.existsSync(picsPath)) {
       return res.json({ success: true, pics: [] });
     }
 
-    const picFiles = fs.readdirSync(picsPath).filter(file => file.endsWith('.json'));
+    const picFiles = fs
+      .readdirSync(picsPath)
+      .filter((file) => file.endsWith(".json"));
     const assignedPics = [];
 
-    picFiles.forEach(file => {
+    picFiles.forEach((file) => {
       const filePath = path.join(picsPath, file);
       const picData = readJsonFile(filePath);
-      
+
       if (picData && picData.groups && picData.groups.includes(groupId)) {
         assignedPics.push(picData);
       }
@@ -1796,7 +1979,9 @@ app.post("/api/pics/:picId/groups/:groupId/leader", (req, res) => {
 
     // Check if PIC is assigned to the group
     if (!picData.groups || !picData.groups.includes(groupId)) {
-      return res.status(400).json({ error: "PIC is not assigned to this group" });
+      return res
+        .status(400)
+        .json({ error: "PIC is not assigned to this group" });
     }
 
     // Initialize groupLeaderships array if it doesn't exist
@@ -1806,7 +1991,9 @@ app.post("/api/pics/:picId/groups/:groupId/leader", (req, res) => {
 
     // Check if PIC is already leader of this group
     if (picData.groupLeaderships.includes(groupId)) {
-      return res.status(400).json({ error: "PIC is already leader of this group" });
+      return res
+        .status(400)
+        .json({ error: "PIC is already leader of this group" });
     }
 
     // Add group to PIC's leadership
@@ -1815,10 +2002,10 @@ app.post("/api/pics/:picId/groups/:groupId/leader", (req, res) => {
 
     // Save updated PIC data
     if (writeJsonFile(picFilePath, picData)) {
-      res.json({ 
-        success: true, 
+      res.json({
+        success: true,
         message: "PIC set as group leader successfully",
-        pic: picData 
+        pic: picData,
       });
     } else {
       res.status(500).json({ error: "Failed to update PIC data" });
@@ -1866,10 +2053,10 @@ app.delete("/api/pics/:picId/groups/:groupId/leader", (req, res) => {
 
     // Save updated PIC data
     if (writeJsonFile(picFilePath, picData)) {
-      res.json({ 
-        success: true, 
+      res.json({
+        success: true,
         message: "PIC removed as group leader successfully",
-        pic: picData 
+        pic: picData,
       });
     } else {
       res.status(500).json({ error: "Failed to update PIC data" });
@@ -2088,11 +2275,11 @@ app.post("/api/refresh-pic-assignment", (req, res) => {
 
     const folders = [
       "DungHan/mustRep",
-      "DungHan/rep", 
+      "DungHan/rep",
       "QuaHan/chuaRep",
       "QuaHan/daRep",
       "ReviewMail/pending",
-      "ReviewMail/processed"
+      "ReviewMail/processed",
     ];
 
     for (const folder of folders) {
@@ -2117,7 +2304,10 @@ app.post("/api/refresh-pic-assignment", (req, res) => {
       try {
         senderEmail = decryptMailFrom(mailData.EncryptedFrom);
       } catch (err) {
-        console.log("Could not decrypt sender email, using original:", mailData.From);
+        console.log(
+          "Could not decrypt sender email, using original:",
+          mailData.From
+        );
       }
     }
 
@@ -2126,24 +2316,29 @@ app.post("/api/refresh-pic-assignment", (req, res) => {
     }
 
     // Find groups that match sender email domain
-    const senderDomain = senderEmail.split('@')[1];
+    const senderDomain = senderEmail.split("@")[1];
     const groupsPath = path.join(ASSIGNMENT_DATA_PATH, "Groups");
-    
+
     if (!fs.existsSync(groupsPath)) {
       return res.status(404).json({ error: "No groups found" });
     }
 
-    const groupFiles = fs.readdirSync(groupsPath).filter(file => file.endsWith('.json'));
+    const groupFiles = fs
+      .readdirSync(groupsPath)
+      .filter((file) => file.endsWith(".json"));
     let matchingGroup = null;
 
     // Find group with matching member domain
     for (const groupFile of groupFiles) {
       const groupPath = path.join(groupsPath, groupFile);
       const groupData = readJsonFile(groupPath);
-      
+
       if (groupData && groupData.members) {
         for (const memberEmail of groupData.members) {
-          if (memberEmail.includes(senderDomain) || memberEmail === senderEmail) {
+          if (
+            memberEmail.includes(senderDomain) ||
+            memberEmail === senderEmail
+          ) {
             matchingGroup = groupData;
             break;
           }
@@ -2153,40 +2348,46 @@ app.post("/api/refresh-pic-assignment", (req, res) => {
     }
 
     if (!matchingGroup) {
-      return res.status(404).json({ 
+      return res.status(404).json({
         error: `No group found for sender domain: ${senderDomain}`,
         senderEmail,
-        senderDomain
+        senderDomain,
       });
     }
 
     // Find leader PIC for the matching group
     const picsPath = path.join(ASSIGNMENT_DATA_PATH, "PIC");
-    
+
     if (!fs.existsSync(picsPath)) {
       return res.status(404).json({ error: "No PICs found" });
     }
 
-    const picFiles = fs.readdirSync(picsPath).filter(file => file.endsWith('.json'));
+    const picFiles = fs
+      .readdirSync(picsPath)
+      .filter((file) => file.endsWith(".json"));
     let leaderPic = null;
 
     // Find PIC who is leader of the matching group
     for (const picFile of picFiles) {
       const picPath = path.join(picsPath, picFile);
       const picData = readJsonFile(picPath);
-      
-      if (picData && 
-          picData.groups && picData.groups.includes(matchingGroup.id) &&
-          picData.groupLeaderships && picData.groupLeaderships.includes(matchingGroup.id)) {
+
+      if (
+        picData &&
+        picData.groups &&
+        picData.groups.includes(matchingGroup.id) &&
+        picData.groupLeaderships &&
+        picData.groupLeaderships.includes(matchingGroup.id)
+      ) {
         leaderPic = picData;
         break;
       }
     }
 
     if (!leaderPic) {
-      return res.status(404).json({ 
+      return res.status(404).json({
         error: `No leader PIC found for group: ${matchingGroup.name}`,
-        matchingGroup: matchingGroup.name
+        matchingGroup: matchingGroup.name,
       });
     }
 
@@ -2201,14 +2402,14 @@ app.post("/api/refresh-pic-assignment", (req, res) => {
         picName: leaderPic.name,
         picEmail: leaderPic.email,
         groupName: matchingGroup.name,
-        autoAssigned: true
+        autoAssigned: true,
       },
       updatedAt: new Date().toISOString(),
     };
 
     if (writeJsonFile(mailFilePath, updatedMail)) {
-      res.json({ 
-        success: true, 
+      res.json({
+        success: true,
         message: `Mail auto-assigned to leader PIC: ${leaderPic.name}`,
         mail: updatedMail,
         assignment: {
@@ -2216,29 +2417,31 @@ app.post("/api/refresh-pic-assignment", (req, res) => {
           picEmail: leaderPic.email,
           groupName: matchingGroup.name,
           senderEmail,
-          senderDomain
-        }
+          senderDomain,
+        },
       });
     } else {
       res.status(500).json({ error: "Failed to assign mail" });
     }
-
   } catch (err) {
     console.error("Error in auto-assign PIC:", err);
-    res.status(500).json({ error: "Internal server error", details: err.message });
+    res
+      .status(500)
+      .json({ error: "Internal server error", details: err.message });
   }
 });
 
 // Refresh PICs and Groups data endpoint
 app.post("/api/refresh-pics", (req, res) => {
   console.log("� Refresh endpoint called");
-  res.json({ 
-    success: true, 
-    message: "PICs refreshed successfully! Auto-assigned 0 mail(s) from 0 checked.",
+  res.json({
+    success: true,
+    message:
+      "PICs refreshed successfully! Auto-assigned 0 mail(s) from 0 checked.",
     assignedCount: 0,
     totalChecked: 0,
     results: [],
-    timestamp: new Date()
+    timestamp: new Date(),
   });
 });
 
@@ -2246,7 +2449,7 @@ app.post("/api/refresh-pics", (req, res) => {
 app.post("/api/trigger-auto-assign", (req, res) => {
   try {
     console.log("🔄 Manual auto-assignment triggered");
-    
+
     // Test response without calling auto-assignment
     res.json({
       success: true,
@@ -2254,15 +2457,14 @@ app.post("/api/trigger-auto-assign", (req, res) => {
       assignedCount: 0,
       totalChecked: 0,
       results: [],
-      timestamp: new Date()
+      timestamp: new Date(),
     });
-    
   } catch (error) {
     console.error("Error in manual auto-assignment:", error);
     res.status(500).json({
       success: false,
       error: error.message,
-      timestamp: new Date()
+      timestamp: new Date(),
     });
   }
 });
@@ -2445,37 +2647,48 @@ app.post("/api/move-to-review", (req, res) => {
     // SIMPLE LOGIC: Find file location → determine target folder
     console.log(`📤 Moving mail to review: ${mailData.Subject}`);
     console.log(`📧 Mail ID: ${mailId}`);
-    
+
     // Step 1: Find where the file actually exists
     const actualFilePath = findMailFile(mailData);
     if (!actualFilePath) {
       return res.status(404).json({ error: "Mail file not found" });
     }
-    
+
     console.log(`� Found file at: ${actualFilePath}`);
-    
+
     // Step 2: Determine target folder based on CURRENT location
     let targetReviewFolder = "pending"; // default
     let shouldMarkAsReplied = false;
-    
+
     console.log(`🔍 Checking file path: ${actualFilePath}`);
     console.log(`🔍 Lower case path: ${actualFilePath.toLowerCase()}`);
-    
+
     // Check if file is from "replied" folders (case insensitive)
     const lowerPath = actualFilePath.toLowerCase();
-    
+
     // Check for SPECIFIC REPLIED folders first (more specific patterns)
-    if (lowerPath.includes('\\rep\\') || lowerPath.includes('/rep/') ||
-        lowerPath.includes('\\darep\\') || lowerPath.includes('/darep/') ||
-        lowerPath.endsWith('\\rep') || lowerPath.endsWith('/rep')) {
+    if (
+      lowerPath.includes("\\rep\\") ||
+      lowerPath.includes("/rep/") ||
+      lowerPath.includes("\\darep\\") ||
+      lowerPath.includes("/darep/") ||
+      lowerPath.endsWith("\\rep") ||
+      lowerPath.endsWith("/rep")
+    ) {
       // Files from "replied" folders go to processed
       targetReviewFolder = "processed";
       shouldMarkAsReplied = true;
       console.log(`🎯 From replied folder → processed`);
-    } else if (lowerPath.includes('\\mustrep\\') || lowerPath.includes('/mustrep/') ||
-               lowerPath.includes('\\chuarep\\') || lowerPath.includes('/chuarep/') ||
-               lowerPath.endsWith('\\mustrep') || lowerPath.endsWith('/mustrep') ||
-               lowerPath.endsWith('\\chuarep') || lowerPath.endsWith('/chuarep')) {
+    } else if (
+      lowerPath.includes("\\mustrep\\") ||
+      lowerPath.includes("/mustrep/") ||
+      lowerPath.includes("\\chuarep\\") ||
+      lowerPath.includes("/chuarep/") ||
+      lowerPath.endsWith("\\mustrep") ||
+      lowerPath.endsWith("/mustrep") ||
+      lowerPath.endsWith("\\chuarep") ||
+      lowerPath.endsWith("/chuarep")
+    ) {
       // Files from "unreplied" folders go to pending
       targetReviewFolder = "pending";
       shouldMarkAsReplied = false;
@@ -2484,11 +2697,17 @@ app.post("/api/move-to-review", (req, res) => {
       // Default: pending for unknown locations
       console.log(`⚠️  Unknown location, using default: pending`);
     }
-    
-    console.log(`🎯 Target ReviewMail folder: ${targetReviewFolder} (based on current location)`);
+
+    console.log(
+      `🎯 Target ReviewMail folder: ${targetReviewFolder} (based on current location)`
+    );
 
     // Create target ReviewMail directory if it doesn't exist
-    const reviewMailTargetPath = path.join(MAIL_DATA_PATH, "ReviewMail", targetReviewFolder);
+    const reviewMailTargetPath = path.join(
+      MAIL_DATA_PATH,
+      "ReviewMail",
+      targetReviewFolder
+    );
     if (!fs.existsSync(reviewMailTargetPath)) {
       fs.mkdirSync(reviewMailTargetPath, { recursive: true });
       console.log(`📁 Created directory: ${reviewMailTargetPath}`);
@@ -2538,8 +2757,8 @@ app.post("/api/move-to-review", (req, res) => {
     const reviewFilePath = path.join(reviewMailTargetPath, fileName);
 
     // Update filePath in reviewMailData to reflect new location INCLUDING subfolder
-    reviewMailData.filePath = reviewFilePath.replace(/\//g, '\\');
-    
+    reviewMailData.filePath = reviewFilePath.replace(/\//g, "\\");
+
     console.log(`📂 Setting filePath to: ${reviewMailData.filePath}`);
 
     // Write the mail to ReviewMail folder
@@ -2598,40 +2817,53 @@ app.post("/api/move-back-from-review", (req, res) => {
     // Determine current ReviewMail status from filePath
     let currentReviewStatus = "pending"; // default
     if (mailData.filePath) {
-      if (mailData.filePath.includes("/processed/") || mailData.filePath.includes("\\processed\\")) {
+      if (
+        mailData.filePath.includes("/processed/") ||
+        mailData.filePath.includes("\\processed\\")
+      ) {
         currentReviewStatus = "processed";
-      } else if (mailData.filePath.includes("/pending/") || mailData.filePath.includes("\\pending\\")) {
+      } else if (
+        mailData.filePath.includes("/pending/") ||
+        mailData.filePath.includes("\\pending\\")
+      ) {
         currentReviewStatus = "pending";
       }
     }
-    
+
     console.log(`🔍 Current ReviewMail status: ${currentReviewStatus}`);
 
     // Determine target status based on original category and current review status
     let targetStatus;
     let targetCategory = mailData.originalCategory;
-    
+
     if (targetCategory === "DungHan") {
       // Valid mails: processed -> rep, pending -> mustRep
       targetStatus = currentReviewStatus === "processed" ? "rep" : "mustRep";
     } else if (targetCategory === "QuaHan") {
-      // Expired mails: processed -> daRep, pending -> chuaRep  
+      // Expired mails: processed -> daRep, pending -> chuaRep
       targetStatus = currentReviewStatus === "processed" ? "daRep" : "chuaRep";
     } else {
       // Fallback: determine by isExpired
       if (mailData.isExpired) {
         targetCategory = "QuaHan";
-        targetStatus = currentReviewStatus === "processed" ? "daRep" : "chuaRep";
+        targetStatus =
+          currentReviewStatus === "processed" ? "daRep" : "chuaRep";
       } else {
         targetCategory = "DungHan";
         targetStatus = currentReviewStatus === "processed" ? "rep" : "mustRep";
       }
     }
 
-    console.log(`🎯 Target category: ${targetCategory}, Target status: ${targetStatus}`);
+    console.log(
+      `🎯 Target category: ${targetCategory}, Target status: ${targetStatus}`
+    );
 
     // Determine original folder path based on target category and status
-    const originalFolderPath = path.join(MAIL_DATA_PATH, targetCategory, targetStatus);
+    const originalFolderPath = path.join(
+      MAIL_DATA_PATH,
+      targetCategory,
+      targetStatus
+    );
 
     console.log(`📁 Target folder: ${originalFolderPath}`);
 
@@ -2684,13 +2916,16 @@ app.post("/api/move-back-from-review", (req, res) => {
 
       // Remove mail from ReviewMail folder - check both pending and processed folders
       const reviewMailBasePath = path.join(MAIL_DATA_PATH, "ReviewMail");
-      const reviewFileName = mailData.fileName || path.basename(mailData.filePath) || `${mailData.id}.json`;
-      
+      const reviewFileName =
+        mailData.fileName ||
+        path.basename(mailData.filePath) ||
+        `${mailData.id}.json`;
+
       // Try to find and remove from current location
       const possiblePaths = [
         path.join(reviewMailBasePath, "pending", reviewFileName),
         path.join(reviewMailBasePath, "processed", reviewFileName),
-        path.join(reviewMailBasePath, reviewFileName) // Legacy location
+        path.join(reviewMailBasePath, reviewFileName), // Legacy location
       ];
 
       let removedFrom = null;
@@ -2742,13 +2977,13 @@ app.put("/api/review-mails/:id/status", (req, res) => {
 
     // Find the ReviewMail file
     const allMails = loadAllMails();
-    const mail = allMails.find((m) =>
-      m.category === "ReviewMail" && (
-        m.id === id ||
-        m.id === parseInt(id) ||
-        path.parse(m.fileName).name === id ||
-        m.fileName === `${id}.json`
-      )
+    const mail = allMails.find(
+      (m) =>
+        m.category === "ReviewMail" &&
+        (m.id === id ||
+          m.id === parseInt(id) ||
+          path.parse(m.fileName).name === id ||
+          m.fileName === `${id}.json`)
     );
 
     if (!mail) {
@@ -2758,7 +2993,9 @@ app.put("/api/review-mails/:id/status", (req, res) => {
       });
     }
 
-    console.log(`[Debug] Found ReviewMail: ${mail.Subject}, current status: ${mail.status}`);
+    console.log(
+      `[Debug] Found ReviewMail: ${mail.Subject}, current status: ${mail.status}`
+    );
 
     // Find actual file location using findMailFile (not cached filePath)
     const actualFilePath = findMailFile(mail);
@@ -2782,17 +3019,25 @@ app.put("/api/review-mails/:id/status", (req, res) => {
 
     // Use the provided status
     const newStatus = status;
-    
+
     // Determine current status from ACTUAL folder path
     let currentStatus = "pending"; // default
-    if (actualFilePath.includes("ReviewMail\\processed") || actualFilePath.includes("ReviewMail/processed")) {
+    if (
+      actualFilePath.includes("ReviewMail\\processed") ||
+      actualFilePath.includes("ReviewMail/processed")
+    ) {
       currentStatus = "processed";
-    } else if (actualFilePath.includes("ReviewMail\\pending") || actualFilePath.includes("ReviewMail/pending")) {
+    } else if (
+      actualFilePath.includes("ReviewMail\\pending") ||
+      actualFilePath.includes("ReviewMail/pending")
+    ) {
       currentStatus = "pending";
     }
-    
-    console.log(`📁 Current status from actual folder: ${currentStatus}, requested: ${newStatus}`);
-    
+
+    console.log(
+      `📁 Current status from actual folder: ${currentStatus}, requested: ${newStatus}`
+    );
+
     // Skip if already in correct folder
     if (currentStatus === newStatus) {
       return res.json({
@@ -2808,34 +3053,34 @@ app.put("/api/review-mails/:id/status", (req, res) => {
     const fileName = mail.fileName;
     const newFolderPath = path.join(MAIL_DATA_PATH, "ReviewMail", newStatus);
     const newFilePath = path.join(newFolderPath, fileName);
-    
+
     console.log(`📁 Moving ReviewMail from ${oldFilePath} to ${newFilePath}`);
-    
+
     // Ensure destination folder exists
     if (!fs.existsSync(newFolderPath)) {
       fs.mkdirSync(newFolderPath, { recursive: true });
       console.log(`📁 Created directory: ${newFolderPath}`);
     }
-    
+
     // Update mail data - only update path, remove status field
     mailData.isReplied = newStatus === "processed"; // Set based on folder
     mailData.filePath = newFilePath;
-    
+
     // Remove status field - we determine status from folder path only
     console.log(`🗑️ Before delete - mailData keys:`, Object.keys(mailData));
     delete mailData.status;
     console.log(`🗑️ After delete - mailData keys:`, Object.keys(mailData));
-    
+
     // Also remove from nested objects if they exist
     if (mailData.originalData && mailData.originalData.status) {
       delete mailData.originalData.status;
     }
-    
+
     // Add processing timestamp
     if (newStatus === "processed" && !mailData.processedDate) {
       mailData.processedDate = new Date().toISOString();
     }
-    
+
     // Write to new location
     if (writeJsonFile(newFilePath, mailData)) {
       // Remove from old location
@@ -2843,8 +3088,10 @@ app.put("/api/review-mails/:id/status", (req, res) => {
         fs.unlinkSync(oldFilePath);
         console.log(`🗑️ Removed old file: ${oldFilePath}`);
       }
-      
-      console.log(`✅ Updated ReviewMail status: ${mail.Subject} -> ${newStatus}`);
+
+      console.log(
+        `✅ Updated ReviewMail status: ${mail.Subject} -> ${newStatus}`
+      );
 
       // Broadcast update to clients
       broadcastToClients("reviewMailStatusUpdated", {
@@ -2900,7 +3147,7 @@ const findMailFile = (mailData) => {
   // Search in all possible mail folders
   const searchFolders = [
     "DungHan/mustRep",
-    "DungHan/rep", 
+    "DungHan/rep",
     "DungHan",
     "QuaHan/chuaRep",
     "QuaHan/daRep",
@@ -3091,39 +3338,60 @@ app.post("/api/move-selected-to-review", (req, res) => {
         }
 
         console.log(`🔍 Batch move - checking file path: ${originalFilePath}`);
-        console.log(`🔍 Batch move - lower case path: ${originalFilePath.toLowerCase()}`);
-        
+        console.log(
+          `🔍 Batch move - lower case path: ${originalFilePath.toLowerCase()}`
+        );
+
         // Determine target folder based on file location (same logic as single move)
         let targetReviewFolder = "pending"; // default
         let shouldMarkAsReplied = false;
-        
+
         const lowerPath = originalFilePath.toLowerCase();
-        
+
         // Check for SPECIFIC REPLIED folders first
-        if (lowerPath.includes('\\rep\\') || lowerPath.includes('/rep/') ||
-            lowerPath.includes('\\darep\\') || lowerPath.includes('/darep/') ||
-            lowerPath.endsWith('\\rep') || lowerPath.endsWith('/rep')) {
+        if (
+          lowerPath.includes("\\rep\\") ||
+          lowerPath.includes("/rep/") ||
+          lowerPath.includes("\\darep\\") ||
+          lowerPath.includes("/darep/") ||
+          lowerPath.endsWith("\\rep") ||
+          lowerPath.endsWith("/rep")
+        ) {
           targetReviewFolder = "processed";
           shouldMarkAsReplied = true;
           console.log(`🎯 Batch move - from replied folder → processed`);
-        } else if (lowerPath.includes('\\mustrep\\') || lowerPath.includes('/mustrep/') ||
-                   lowerPath.includes('\\chuarep\\') || lowerPath.includes('/chuarep/') ||
-                   lowerPath.endsWith('\\mustrep') || lowerPath.endsWith('/mustrep') ||
-                   lowerPath.endsWith('\\chuarep') || lowerPath.endsWith('/chuarep')) {
+        } else if (
+          lowerPath.includes("\\mustrep\\") ||
+          lowerPath.includes("/mustrep/") ||
+          lowerPath.includes("\\chuarep\\") ||
+          lowerPath.includes("/chuarep/") ||
+          lowerPath.endsWith("\\mustrep") ||
+          lowerPath.endsWith("/mustrep") ||
+          lowerPath.endsWith("\\chuarep") ||
+          lowerPath.endsWith("/chuarep")
+        ) {
           targetReviewFolder = "pending";
           shouldMarkAsReplied = false;
           console.log(`🎯 Batch move - from unreplied folder → pending`);
         } else {
-          console.log(`⚠️  Batch move - unknown location, using default: pending`);
+          console.log(
+            `⚠️  Batch move - unknown location, using default: pending`
+          );
         }
 
         console.log(`🎯 Batch move - target folder: ${targetReviewFolder}`);
 
         // Create target subfolder if needed
-        const reviewMailTargetPath = path.join(MAIL_DATA_PATH, "ReviewMail", targetReviewFolder);
+        const reviewMailTargetPath = path.join(
+          MAIL_DATA_PATH,
+          "ReviewMail",
+          targetReviewFolder
+        );
         if (!fs.existsSync(reviewMailTargetPath)) {
           fs.mkdirSync(reviewMailTargetPath, { recursive: true });
-          console.log(`📁 Batch move - created directory: ${reviewMailTargetPath}`);
+          console.log(
+            `📁 Batch move - created directory: ${reviewMailTargetPath}`
+          );
         }
 
         const now = new Date();
@@ -3139,18 +3407,23 @@ app.post("/api/move-selected-to-review", (req, res) => {
           isReplied: shouldMarkAsReplied, // Based on folder location
           processedDate: shouldMarkAsReplied ? now.toISOString() : undefined, // Only if processed
         };
-        
-        const fileName = mailData.fileName || 
-                        (mailData.filePath ? path.basename(mailData.filePath) : 
-                         (mailData.id ? `${mailData.id}.json` : 
-                          `${mailData.Subject.replace(/[<>:"/\\|?*]/g, "_")}.json`));
-        
+
+        const fileName =
+          mailData.fileName ||
+          (mailData.filePath
+            ? path.basename(mailData.filePath)
+            : mailData.id
+            ? `${mailData.id}.json`
+            : `${mailData.Subject.replace(/[<>:"/\\|?*]/g, "_")}.json`);
+
         const reviewFilePath = path.join(reviewMailTargetPath, fileName);
 
         // Update filePath to include subfolder
-        reviewMailData.filePath = reviewFilePath.replace(/\//g, '\\');
-        
-        console.log(`📂 Batch move - setting filePath to: ${reviewMailData.filePath}`);
+        reviewMailData.filePath = reviewFilePath.replace(/\//g, "\\");
+
+        console.log(
+          `📂 Batch move - setting filePath to: ${reviewMailData.filePath}`
+        );
 
         if (writeJsonFile(reviewFilePath, reviewMailData)) {
           fs.unlinkSync(originalFilePath);
@@ -3435,7 +3708,7 @@ app.put("/api/users/:username", (req, res) => {
         }
       }
     }
-    
+
     if (userFilePath) {
       fs.writeFileSync(userFilePath, JSON.stringify(updatedUser, null, 2));
     } else {
@@ -3678,9 +3951,9 @@ app.put("/api/users/by-id/:id/admin", (req, res) => {
     // Update user role (only role, remove any existing isAdmin field)
     userToUpdate.role = isAdmin ? "admin" : "user";
     userToUpdate.updatedAt = new Date().toISOString();
-    
+
     // Remove isAdmin field if it exists (we only use role)
-    if (userToUpdate.hasOwnProperty('isAdmin')) {
+    if (userToUpdate.hasOwnProperty("isAdmin")) {
       delete userToUpdate.isAdmin;
     }
 
@@ -3722,14 +3995,17 @@ app.put("/api/users/by-id/:id/admin", (req, res) => {
 // Update user (admin only)
 // Simple test endpoint
 app.get("/api/test", (req, res) => {
-  res.json({ message: "Server is working", timestamp: new Date().toISOString() });
+  res.json({
+    message: "Server is working",
+    timestamp: new Date().toISOString(),
+  });
 });
 
 // Debug endpoint for user finding
 app.get("/api/debug/users/:id", (req, res) => {
   const { id } = req.params;
   console.log(`🔍 [DEBUG] Looking for user ID: "${id}" (type: ${typeof id})`);
-  
+
   createUserDirectory();
   let userFound = null;
   let debugInfo = {
@@ -3738,29 +4014,29 @@ app.get("/api/debug/users/:id", (req, res) => {
     userDataPath: USER_DATA_PATH,
     pathExists: fs.existsSync(USER_DATA_PATH),
     files: [],
-    matchFound: false
+    matchFound: false,
   };
 
   if (fs.existsSync(USER_DATA_PATH)) {
     const userFiles = fs.readdirSync(USER_DATA_PATH);
     debugInfo.totalFiles = userFiles.length;
-    
+
     for (const file of userFiles) {
       if (file.endsWith(".json")) {
         const filePath = path.join(USER_DATA_PATH, file);
         const userData = readJsonFile(filePath);
-        
+
         const fileInfo = {
           filename: file,
           idInFile: userData?.id,
           idType: typeof userData?.id,
           stringMatch: String(userData?.id) === String(id),
           directMatch: userData?.id === id,
-          username: userData?.username
+          username: userData?.username,
         };
-        
+
         debugInfo.files.push(fileInfo);
-        
+
         if (userData && String(userData.id) === String(id)) {
           userFound = userData;
           debugInfo.matchFound = true;
@@ -3773,7 +4049,9 @@ app.get("/api/debug/users/:id", (req, res) => {
   res.json({
     success: true,
     debugInfo,
-    userFound: userFound ? { id: userFound.id, username: userFound.username } : null
+    userFound: userFound
+      ? { id: userFound.id, username: userFound.username }
+      : null,
   });
 });
 
@@ -3796,10 +4074,10 @@ app.put("/api/users/by-id/:id", (req, res) => {
   try {
     // Đơn giản: tên file = ID + .json
     const userFilePath = path.join(USER_DATA_PATH, `${id}.json`);
-    
+
     console.log(`� [PUT] Checking file: ${userFilePath}`);
     console.log(`� [PUT] File exists: ${fs.existsSync(userFilePath)}`);
-    
+
     // Kiểm tra file có tồn tại không
     if (!fs.existsSync(userFilePath)) {
       console.log(`❌ [PUT] File not found: ${userFilePath}`);
@@ -3819,7 +4097,9 @@ app.put("/api/users/by-id/:id", (req, res) => {
       });
     }
 
-    console.log(`✅ [PUT] Found user: ${userToUpdate.username} (ID: ${userToUpdate.id})`);
+    console.log(
+      `✅ [PUT] Found user: ${userToUpdate.username} (ID: ${userToUpdate.id})`
+    );
 
     // Check if username changed and already exists (skip nếu username không đổi)
     if (username !== userToUpdate.username) {
@@ -3848,20 +4128,25 @@ app.put("/api/users/by-id/:id", (req, res) => {
       fullName: fullName || userToUpdate.fullName,
       department: department || userToUpdate.department,
       phone: phone || userToUpdate.phone,
-      role: isAdmin !== undefined ? (isAdmin ? "admin" : "user") : userToUpdate.role,
+      role:
+        isAdmin !== undefined
+          ? isAdmin
+            ? "admin"
+            : "user"
+          : userToUpdate.role,
       isActive: isActive !== undefined ? isActive : userToUpdate.isActive,
       updatedAt: new Date().toISOString(),
     };
-    
+
     // Remove isAdmin field if it exists (we only use role)
-    if (updatedUser.hasOwnProperty('isAdmin')) {
+    if (updatedUser.hasOwnProperty("isAdmin")) {
       delete updatedUser.isAdmin;
     }
 
     // Save updated user
     if (writeJsonFile(userFilePath, updatedUser)) {
       console.log(`✅ [PUT] User updated successfully: ${userFilePath}`);
-      
+
       res.json({
         success: true,
         message: "User updated successfully",
@@ -3987,11 +4272,11 @@ app.put("/api/users/:username/password", (req, res) => {
 
   try {
     createUserDirectory();
-    
+
     // Find user by username
     let userData = null;
     let userFilePath = null;
-    
+
     if (fs.existsSync(USER_DATA_PATH)) {
       const userFiles = fs.readdirSync(USER_DATA_PATH);
       for (const file of userFiles) {

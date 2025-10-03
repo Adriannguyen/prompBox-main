@@ -1,5 +1,5 @@
-const express = require('express');
-const cors = require('cors');
+const express = require("express");
+const cors = require("cors");
 
 const app = express();
 const port = 3004; // Different port
@@ -11,25 +11,25 @@ app.use(express.json());
 // Simple refresh endpoint
 app.post("/api/refresh-pics", (req, res) => {
   console.log("Refresh called at", new Date());
-  
+
   try {
     const response = {
       success: true,
-      message: "PICs refreshed successfully! Auto-assigned 0 mail(s) from 0 checked.",
+      message:
+        "PICs refreshed successfully! Auto-assigned 0 mail(s) from 0 checked.",
       assignedCount: 0,
       totalChecked: 0,
       results: [],
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     };
-    
+
     res.status(200).json(response);
     console.log("Response sent successfully");
-    
   } catch (error) {
     console.error("Error:", error);
     res.status(500).json({
       success: false,
-      error: error.message
+      error: error.message,
     });
   }
 });
@@ -40,7 +40,7 @@ app.get("/health", (req, res) => {
   res.json({
     status: "OK",
     timestamp: new Date(),
-    port: port
+    port: port,
   });
 });
 
@@ -49,7 +49,7 @@ app.listen(port, () => {
 });
 
 // Graceful shutdown
-process.on('SIGINT', () => {
-  console.log('Shutting down test server...');
+process.on("SIGINT", () => {
+  console.log("Shutting down test server...");
   process.exit(0);
 });

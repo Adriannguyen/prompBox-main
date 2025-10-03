@@ -245,12 +245,15 @@ const Assignment = () => {
       setLoading(true);
       // Add cache-busting parameter to ensure fresh data
       const timestamp = new Date().getTime();
-      const response = await fetch(`${API_BASE_URL}/api/users?_t=${timestamp}`, {
-        headers: {
-          'Cache-Control': 'no-cache',
-          'Pragma': 'no-cache'
+      const response = await fetch(
+        `${API_BASE_URL}/api/users?_t=${timestamp}`,
+        {
+          headers: {
+            "Cache-Control": "no-cache",
+            Pragma: "no-cache",
+          },
         }
-      });
+      );
 
       if (response.ok) {
         const data = await response.json();
@@ -361,7 +364,9 @@ const Assignment = () => {
 
   const handleCreatePic = async () => {
     try {
-      const url = editingPic ? `${API_BASE_URL}/api/pics/${editingPic.id}` : `${API_BASE_URL}/api/pics`;
+      const url = editingPic
+        ? `${API_BASE_URL}/api/pics/${editingPic.id}`
+        : `${API_BASE_URL}/api/pics`;
       const method = editingPic ? "PUT" : "POST";
 
       const response = await fetch(url, {
@@ -443,7 +448,7 @@ const Assignment = () => {
     console.log("🔧 handleCreateUser called");
     console.log("🔧 Current userForm state:", userForm);
     console.log("🔧 editingUser:", editingUser);
-    
+
     try {
       // Validation
       if (!userForm.username || !userForm.email) {
@@ -463,7 +468,9 @@ const Assignment = () => {
         return;
       }
 
-  const url = editingUser ? `${API_BASE_URL}/api/users/by-id/${editingUser.id}` : `${API_BASE_URL}/api/users`;
+      const url = editingUser
+        ? `${API_BASE_URL}/api/users/by-id/${editingUser.id}`
+        : `${API_BASE_URL}/api/users`;
       const method = editingUser ? "PUT" : "POST";
 
       // Prepare data to send
@@ -474,7 +481,10 @@ const Assignment = () => {
         delete userData.password;
       }
 
-      console.log(`🔧 ${editingUser ? "Updating" : "Creating"} user with data:`, userData);
+      console.log(
+        `🔧 ${editingUser ? "Updating" : "Creating"} user with data:`,
+        userData
+      );
 
       const response = await fetch(url, {
         method,
@@ -529,7 +539,7 @@ const Assignment = () => {
   const handleEditUser = (user) => {
     console.log("🔧 handleEditUser called with user:", user);
     console.log("🔧 User isAdmin:", user.isAdmin, "isActive:", user.isActive);
-    
+
     setEditingUser(user);
     const formData = {
       username: user.username,
@@ -539,7 +549,7 @@ const Assignment = () => {
       isAdmin: user.isAdmin,
       isActive: user.isActive,
     };
-    
+
     console.log("🔧 Setting userForm to:", formData);
     setUserForm(formData);
     setUserModal(true);
@@ -570,9 +580,12 @@ const Assignment = () => {
       try {
         console.log("🗑️ Deleting user:", userId);
 
-        const response = await fetch(`${API_BASE_URL}/api/users/by-id/${userId}`, {
-          method: "DELETE",
-        });
+        const response = await fetch(
+          `${API_BASE_URL}/api/users/by-id/${userId}`,
+          {
+            method: "DELETE",
+          }
+        );
 
         if (response.ok) {
           const result = await response.json();
@@ -629,7 +642,7 @@ const Assignment = () => {
         setSuccess(
           `User ${newAdminStatus ? "granted" : "revoked"} admin privileges`
         );
-        
+
         console.log("🔄 Reloading users after admin toggle...");
         await loadUsers();
         console.log("✅ Users reloaded after admin toggle");
@@ -672,7 +685,7 @@ const Assignment = () => {
         setSuccess(
           `User ${newActiveStatus ? "activated" : "deactivated"} successfully`
         );
-        
+
         console.log("🔄 Reloading users after status toggle...");
         await loadUsers();
         console.log("✅ Users reloaded after status toggle");
@@ -730,9 +743,12 @@ const Assignment = () => {
 
   const handleRemovePicFromGroup = async (picId, groupId) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/pics/${picId}/groups/${groupId}`, {
-        method: "DELETE",
-      });
+      const response = await fetch(
+        `${API_BASE_URL}/api/pics/${picId}/groups/${groupId}`,
+        {
+          method: "DELETE",
+        }
+      );
 
       const result = await response.json();
       if (result.success) {
@@ -750,12 +766,15 @@ const Assignment = () => {
 
   const handleSetLeader = async (picId, groupId) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/pics/${picId}/groups/${groupId}/leader`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-      });
+      const response = await fetch(
+        `${API_BASE_URL}/api/pics/${picId}/groups/${groupId}/leader`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+        }
+      );
 
       const result = await response.json();
       if (result.success) {
@@ -772,9 +791,12 @@ const Assignment = () => {
 
   const handleRemoveLeader = async (picId, groupId) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/pics/${picId}/groups/${groupId}/leader`, {
-        method: "DELETE",
-      });
+      const response = await fetch(
+        `${API_BASE_URL}/api/pics/${picId}/groups/${groupId}/leader`,
+        {
+          method: "DELETE",
+        }
+      );
 
       const result = await response.json();
       if (result.success) {
@@ -1171,10 +1193,13 @@ const Assignment = () => {
                     <div>
                       {/* Find PICs assigned to this group */}
                       {(() => {
-                        const assignedPics = Array.isArray(pics) 
-                          ? pics.filter(pic => pic.groups && pic.groups.includes(group.id))
+                        const assignedPics = Array.isArray(pics)
+                          ? pics.filter(
+                              (pic) =>
+                                pic.groups && pic.groups.includes(group.id)
+                            )
                           : [];
-                        
+
                         return assignedPics.length > 0 ? (
                           <div className="mt-1">
                             {assignedPics.slice(0, 2).map((pic, idx) => (
@@ -1186,9 +1211,13 @@ const Assignment = () => {
                                   style={{ fontSize: "0.7rem" }}
                                 >
                                   {pic.name}
-                                  {pic.groupLeaderships && pic.groupLeaderships.includes(group.id) && (
-                                    <i className="ni ni-crown ml-1" title="Group Leader" />
-                                  )}
+                                  {pic.groupLeaderships &&
+                                    pic.groupLeaderships.includes(group.id) && (
+                                      <i
+                                        className="ni ni-crown ml-1"
+                                        title="Group Leader"
+                                      />
+                                    )}
                                 </Badge>
                               </div>
                             ))}
@@ -1225,8 +1254,6 @@ const Assignment = () => {
       </CardBody>
     </Card>
   );
-
-
 
   return (
     <>
@@ -1512,7 +1539,9 @@ const Assignment = () => {
               <div className="mt-3 p-3 bg-light rounded">
                 <small className="text-muted">
                   <i className="ni ni-info-circle mr-1" />
-                  <strong>Note:</strong> After creating the PIC, you can assign them to groups and set leadership roles in the "Assign PIC to Group" tab.
+                  <strong>Note:</strong> After creating the PIC, you can assign
+                  them to groups and set leadership roles in the "Assign PIC to
+                  Group" tab.
                 </small>
               </div>
             </Form>
@@ -1621,8 +1650,14 @@ const Assignment = () => {
                         id="password"
                         value={userForm.password}
                         onChange={(e) => {
-                          console.log("🔧 Password field changed to:", e.target.value);
-                          setUserForm({ ...userForm, password: e.target.value });
+                          console.log(
+                            "🔧 Password field changed to:",
+                            e.target.value
+                          );
+                          setUserForm({
+                            ...userForm,
+                            password: e.target.value,
+                          });
                         }}
                         placeholder={
                           editingUser ? "Enter new password" : "Enter password"
@@ -1662,7 +1697,10 @@ const Assignment = () => {
                           type="checkbox"
                           checked={userForm.isActive}
                           onChange={(e) => {
-                            console.log("🔧 isActive checkbox changed to:", e.target.checked);
+                            console.log(
+                              "🔧 isActive checkbox changed to:",
+                              e.target.checked
+                            );
                             setUserForm({
                               ...userForm,
                               isActive: e.target.checked,
@@ -1678,7 +1716,10 @@ const Assignment = () => {
                           type="checkbox"
                           checked={userForm.isAdmin}
                           onChange={(e) => {
-                            console.log("🔧 isAdmin checkbox changed to:", e.target.checked);
+                            console.log(
+                              "🔧 isAdmin checkbox changed to:",
+                              e.target.checked
+                            );
                             setUserForm({
                               ...userForm,
                               isAdmin: e.target.checked,
@@ -1729,35 +1770,55 @@ const Assignment = () => {
                 <h5>Currently Assigned PICs:</h5>
                 <div className="mb-4">
                   {(() => {
-                    const assignedPics = Array.isArray(pics) 
-                      ? pics.filter(pic => pic.groups && pic.groups.includes(editingGroupForPics.id))
+                    const assignedPics = Array.isArray(pics)
+                      ? pics.filter(
+                          (pic) =>
+                            pic.groups &&
+                            pic.groups.includes(editingGroupForPics.id)
+                        )
                       : [];
-                    
+
                     return assignedPics.length > 0 ? (
                       <div>
                         {assignedPics.map((pic) => (
-                          <div key={pic.id} className="d-flex justify-content-between align-items-center mb-2 p-2 border rounded">
+                          <div
+                            key={pic.id}
+                            className="d-flex justify-content-between align-items-center mb-2 p-2 border rounded"
+                          >
                             <div className="d-flex align-items-center">
                               <div>
                                 <Badge color="success" className="mr-2">
                                   {pic.name}
                                 </Badge>
-                                {pic.groupLeaderships && pic.groupLeaderships.includes(editingGroupForPics.id) && (
-                                  <Badge color="warning" className="mr-2">
-                                    <i className="ni ni-crown mr-1" />
-                                    Leader
-                                  </Badge>
-                                )}
-                                <small className="text-muted">({pic.email})</small>
+                                {pic.groupLeaderships &&
+                                  pic.groupLeaderships.includes(
+                                    editingGroupForPics.id
+                                  ) && (
+                                    <Badge color="warning" className="mr-2">
+                                      <i className="ni ni-crown mr-1" />
+                                      Leader
+                                    </Badge>
+                                  )}
+                                <small className="text-muted">
+                                  ({pic.email})
+                                </small>
                               </div>
                             </div>
                             <div>
-                              {pic.groupLeaderships && pic.groupLeaderships.includes(editingGroupForPics.id) ? (
+                              {pic.groupLeaderships &&
+                              pic.groupLeaderships.includes(
+                                editingGroupForPics.id
+                              ) ? (
                                 <Button
                                   color="outline-warning"
                                   size="sm"
                                   className="mr-2"
-                                  onClick={() => handleRemoveLeader(pic.id, editingGroupForPics.id)}
+                                  onClick={() =>
+                                    handleRemoveLeader(
+                                      pic.id,
+                                      editingGroupForPics.id
+                                    )
+                                  }
                                 >
                                   <i className="ni ni-crown mr-1" />
                                   Remove Leader
@@ -1767,7 +1828,12 @@ const Assignment = () => {
                                   color="warning"
                                   size="sm"
                                   className="mr-2"
-                                  onClick={() => handleSetLeader(pic.id, editingGroupForPics.id)}
+                                  onClick={() =>
+                                    handleSetLeader(
+                                      pic.id,
+                                      editingGroupForPics.id
+                                    )
+                                  }
                                 >
                                   <i className="ni ni-crown mr-1" />
                                   Set Leader
@@ -1776,7 +1842,12 @@ const Assignment = () => {
                               <Button
                                 color="danger"
                                 size="sm"
-                                onClick={() => handleRemovePicFromGroup(pic.id, editingGroupForPics.id)}
+                                onClick={() =>
+                                  handleRemovePicFromGroup(
+                                    pic.id,
+                                    editingGroupForPics.id
+                                  )
+                                }
                               >
                                 Remove
                               </Button>
@@ -1785,7 +1856,9 @@ const Assignment = () => {
                         ))}
                       </div>
                     ) : (
-                      <div className="text-muted">No PICs assigned to this group</div>
+                      <div className="text-muted">
+                        No PICs assigned to this group
+                      </div>
                     );
                   })()}
                 </div>
@@ -1795,24 +1868,38 @@ const Assignment = () => {
                 <h5>Available PICs to Add:</h5>
                 <div>
                   {(() => {
-                    const availablePics = Array.isArray(pics) 
-                      ? pics.filter(pic => !pic.groups || !pic.groups.includes(editingGroupForPics.id))
+                    const availablePics = Array.isArray(pics)
+                      ? pics.filter(
+                          (pic) =>
+                            !pic.groups ||
+                            !pic.groups.includes(editingGroupForPics.id)
+                        )
                       : [];
-                    
+
                     return availablePics.length > 0 ? (
                       <div>
                         {availablePics.map((pic) => (
-                          <div key={pic.id} className="d-flex justify-content-between align-items-center mb-2 p-2 border rounded">
+                          <div
+                            key={pic.id}
+                            className="d-flex justify-content-between align-items-center mb-2 p-2 border rounded"
+                          >
                             <div>
                               <Badge color="info" className="mr-2">
                                 {pic.name}
                               </Badge>
-                              <small className="text-muted">({pic.email})</small>
+                              <small className="text-muted">
+                                ({pic.email})
+                              </small>
                             </div>
                             <Button
                               color="primary"
                               size="sm"
-                              onClick={() => handleAddPicToGroup(pic.id, editingGroupForPics.id)}
+                              onClick={() =>
+                                handleAddPicToGroup(
+                                  pic.id,
+                                  editingGroupForPics.id
+                                )
+                              }
                             >
                               Add to Group
                             </Button>
@@ -1820,7 +1907,9 @@ const Assignment = () => {
                         ))}
                       </div>
                     ) : (
-                      <div className="text-muted">All PICs are already assigned to this group</div>
+                      <div className="text-muted">
+                        All PICs are already assigned to this group
+                      </div>
                     );
                   })()}
                 </div>
