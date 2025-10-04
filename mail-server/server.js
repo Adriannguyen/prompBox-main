@@ -189,7 +189,7 @@ const autoAssignMailToLeaderPIC = (mailData, mailFilePath) => {
     }
 
     // Load groups
-    const groupsPath = path.join(ASSIGNMENT_DATA_PATH, "Group");
+    const groupsPath = path.join(ASSIGNMENT_DATA_PATH, "Groups");
     if (!fs.existsSync(groupsPath)) {
       return { success: false, error: "No groups directory found" };
     }
@@ -711,17 +711,25 @@ io.on("connection", (socket) => {
   });
 });
 
-// Function to auto-assign leader based on sender's group
+// Enhanced function to auto-assign leader based on sender's group with domain matching
 const autoAssignLeaderBySenderGroup = (mailData, filePath = null) => {
   // Skip if already assigned
   if (mailData.assignedTo) {
+    console.log(`📌 Mail already assigned to: ${mailData.assignedTo.picName}`);
     return mailData;
   }
 
   try {
     const groupsPath = path.join(ASSIGNMENT_DATA_PATH, "Groups");
+    const picsPath = path.join(ASSIGNMENT_DATA_PATH, "PIC");
 
     if (!fs.existsSync(groupsPath)) {
+      console.log(`❌ Groups directory not found: ${groupsPath}`);
+      return mailData;
+    }
+
+    if (!fs.existsSync(picsPath)) {
+      console.log(`❌ PIC directory not found: ${picsPath}`);
       return mailData;
     }
 
@@ -729,61 +737,247 @@ const autoAssignLeaderBySenderGroup = (mailData, filePath = null) => {
       .readdirSync(groupsPath)
       .filter((f) => f.endsWith(".json"));
 
-    // Find group that contains sender email
+    console.log(
+      `🔍 Checking ${groupFiles.length} groups for auto-assignment...`
+    );
+
+    const senderEmail = (mailData.From || mailData.EncryptedFrom || "")
+      .toLowerCase()
+      .trim();
+    const senderDomain = senderEmail.includes("@")
+      ? senderEmail.split("@")[1]
+      : "";
+
+    console.log(`📧 Sender: ${senderEmail}, Domain: ${senderDomain}`);
+
+    // Step 1: Find group containing sender
+    let matchedGroup = null;
+    let matchType = null;
+
+    // Priority 1: Exact email match
     for (const file of groupFiles) {
       const groupData = readJsonFile(path.join(groupsPath, file));
       if (!groupData || !groupData.members) continue;
 
-      // Check if sender email is in this group's members
-      const senderEmail = mailData.From || mailData.EncryptedFrom;
-      const isInGroup = groupData.members.some(
-        (member) =>
-          member.toLowerCase().trim() === senderEmail.toLowerCase().trim()
+      const isExactMatch = groupData.members.some(
+        (member) => member.toLowerCase().trim() === senderEmail
       );
 
-      if (isInGroup && groupData.pic && groupData.picEmail) {
-        console.log(
-          `🎯 Auto-assigning mail from ${senderEmail} to group leader: ${groupData.pic} (${groupData.picEmail})`
-        );
-
-        const updatedMailData = {
-          ...mailData,
-          assignedTo: {
-            type: "pic",
-            picId: path.parse(file).name, // Use group ID as PIC ID for now
-            picName: groupData.pic,
-            picEmail: groupData.picEmail,
-            assignedAt: new Date().toISOString(),
-            assignedBy: "system_auto", // Mark as system auto-assignment
-            groupId: path.parse(file).name,
-            groupName: groupData.name,
-          },
-        };
-
-        // Save updated mail data back to file if filePath provided
-        if (filePath) {
-          try {
-            const success = writeJsonFile(filePath, updatedMailData);
-            if (success) {
-              console.log(`💾 Saved auto-assigned mail data to ${filePath}`);
-            } else {
-              console.error(
-                `❌ Failed to save auto-assigned mail data to ${filePath}`
-              );
-            }
-          } catch (saveError) {
-            console.error("❌ Error saving auto-assigned mail:", saveError);
-          }
-        }
-
-        return updatedMailData;
+      if (isExactMatch) {
+        matchedGroup = { data: groupData, file: file };
+        matchType = "exact_email";
+        console.log(`🎯 EXACT MATCH: Found sender in group: ${groupData.name}`);
+        break;
       }
     }
+
+    // Priority 2: Domain match
+    if (!matchedGroup && senderDomain) {
+      for (const file of groupFiles) {
+        const groupData = readJsonFile(path.join(groupsPath, file));
+        if (!groupData || !groupData.members) continue;
+
+        const isDomainMatch = groupData.members.some((member) => {
+          const memberDomain = member.includes("@")
+            ? member.split("@")[1].toLowerCase()
+            : "";
+          return memberDomain === senderDomain;
+        });
+
+        if (isDomainMatch) {
+          matchedGroup = { data: groupData, file: file };
+          matchType = "domain_match";
+          console.log(`🎯 DOMAIN MATCH: Found sender domain in group: ${groupData.name}`);
+          break;
+        }
+      }
+    }
+
+    // Priority 3: Wildcard domain match (*.company.com)
+    if (!matchedGroup && senderDomain) {
+      for (const file of groupFiles) {
+        const groupData = readJsonFile(path.join(groupsPath, file));
+        if (!groupData || !groupData.members) continue;
+
+        const isWildcardMatch = groupData.members.some((member) => {
+          if (member.startsWith("*.")) {
+            const wildcardDomain = member.substring(2).toLowerCase();
+            return senderDomain.endsWith(wildcardDomain);
+          }
+          return false;
+        });
+
+        if (isWildcardMatch) {
+          matchedGroup = { data: groupData, file: file };
+          matchType = "wildcard_match";
+          console.log(`🎯 WILDCARD MATCH: Found sender domain in group: ${groupData.name}`);
+          break;
+        }
+      }
+    }
+
+    if (!matchedGroup) {
+      console.log(`❌ No group found for sender: ${senderEmail}`);
+      return mailData;
+    }
+
+    // Step 2: Find PIC assigned to this group
+    const groupId = path.parse(matchedGroup.file).name;
+    const picFiles = fs
+      .readdirSync(picsPath)
+      .filter((f) => f.endsWith(".json"));
+
+    console.log(`🔍 Looking for PIC assigned to group ${groupId}...`);
+
+    let assignedPic = null;
+    for (const picFile of picFiles) {
+      const picData = readJsonFile(path.join(picsPath, picFile));
+      if (!picData) continue;
+
+      // Check if this PIC is assigned to the matched group
+      if (picData.groups && picData.groups.includes(groupId)) {
+        assignedPic = { data: picData, file: picFile };
+        console.log(`👤 Found PIC assigned to group: ${picData.name} (${picData.email})`);
+        break;
+      }
+    }
+
+    if (!assignedPic) {
+      console.log(`❌ No PIC assigned to group: ${matchedGroup.data.name}`);
+      return mailData;
+    }
+
+    // Step 3: Assign mail to PIC
+    console.log(
+      `✅ Assigning mail from ${senderEmail} to PIC: ${assignedPic.data.name}`
+    );
+    return assignToPic(
+      mailData,
+      matchedGroup.data,
+      assignedPic.data,
+      filePath,
+      matchType
+    );
+
   } catch (error) {
     console.error("❌ Error in auto-assign leader:", error);
+    return mailData;
+  }
+};
+
+// Helper function to assign mail to PIC
+const assignToPic = (mailData, groupData, picData, filePath, matchType) => {
+  const updatedMailData = {
+    ...mailData,
+    assignedTo: {
+      type: "pic",
+      picId: picData.id,
+      picName: picData.name,
+      picEmail: picData.email,
+      assignedAt: new Date().toISOString(),
+      assignedBy: "system_auto",
+      matchType: matchType, // Track how the match was made
+      groupId: groupData.id,
+      groupName: groupData.name,
+    },
+  };
+
+  // Save updated mail data back to file if filePath provided
+  if (filePath) {
+    try {
+      const success = writeJsonFile(filePath, updatedMailData);
+      if (success) {
+        console.log(`💾 Saved auto-assigned mail data to ${filePath}`);
+      } else {
+        console.error(
+          `❌ Failed to save auto-assigned mail data to ${filePath}`
+        );
+      }
+    } catch (saveError) {
+      console.error("❌ Error saving auto-assigned mail:", saveError);
+    }
   }
 
-  return mailData;
+  return updatedMailData;
+};
+
+// Function to auto-assign multiple new mails (batch processing)
+const batchAutoAssignMails = (mailsToProcess = []) => {
+  if (!Array.isArray(mailsToProcess) || mailsToProcess.length === 0) {
+    console.log("ℹ️ No mails to auto-assign");
+    return { assignedCount: 0, results: [] };
+  }
+
+  console.log(
+    `🎯 Starting auto-assignment for ${mailsToProcess.length} mail(s)...`
+  );
+
+  const results = [];
+  let assignedCount = 0;
+
+  for (const mailInfo of mailsToProcess) {
+    try {
+      const { filePath, mailData } = mailInfo;
+
+      if (!mailData || mailData.assignedTo) {
+        console.log(
+          `⏭️ Skipping mail: ${path.basename(filePath)} (already assigned)`
+        );
+        continue;
+      }
+
+      const originalMail = { ...mailData };
+      const updatedMail = autoAssignLeaderBySenderGroup(mailData, filePath);
+
+      if (updatedMail.assignedTo && !originalMail.assignedTo) {
+        assignedCount++;
+        results.push({
+          fileName: path.basename(filePath),
+          sender: updatedMail.From || updatedMail.EncryptedFrom,
+          assignedTo: updatedMail.assignedTo.picName,
+          assignedEmail: updatedMail.assignedTo.picEmail,
+          matchType: updatedMail.assignedTo.matchType,
+          groupName: updatedMail.assignedTo.groupName,
+          success: true,
+        });
+
+        console.log(
+          `✅ Auto-assigned: ${path.basename(filePath)} → ${
+            updatedMail.assignedTo.picName
+          }`
+        );
+      } else {
+        results.push({
+          fileName: path.basename(filePath),
+          sender: mailData.From || mailData.EncryptedFrom,
+          success: false,
+          reason: "No matching group found",
+        });
+
+        console.log(`❌ No assignment found for: ${path.basename(filePath)}`);
+      }
+    } catch (error) {
+      console.error(
+        `❌ Error auto-assigning mail ${mailInfo.filePath}:`,
+        error.message
+      );
+      results.push({
+        fileName: path.basename(mailInfo.filePath),
+        success: false,
+        reason: error.message,
+      });
+    }
+  }
+
+  console.log(
+    `🎯 Auto-assignment completed: ${assignedCount}/${mailsToProcess.length} mails assigned`
+  );
+
+  return {
+    assignedCount,
+    totalProcessed: mailsToProcess.length,
+    results,
+  };
 };
 
 // Function to enrich mail data with assignment information
@@ -1359,7 +1553,7 @@ app.post("/api/simulate-new-mail", (req, res) => {
 
   // Auto-assign leader based on sender's group BEFORE writing file
   console.log(`🎯 Auto-assigning leader for new mail from: ${from}`);
-  mailData = autoAssignLeaderBySenderGroup(mailData, null); // Don't save here, will save below
+  mailData = autoAssignLeaderBySenderGroup(mailData, null); // Get assignment data first
 
   if (writeJsonFile(filePath, mailData)) {
     console.log(`📧 Simulated new mail created: ${fileName}`);
@@ -2433,16 +2627,90 @@ app.post("/api/refresh-pic-assignment", (req, res) => {
 
 // Refresh PICs and Groups data endpoint
 app.post("/api/refresh-pics", (req, res) => {
-  console.log("� Refresh endpoint called");
-  res.json({
-    success: true,
-    message:
-      "PICs refreshed successfully! Auto-assigned 0 mail(s) from 0 checked.",
-    assignedCount: 0,
-    totalChecked: 0,
-    results: [],
-    timestamp: new Date(),
-  });
+  try {
+    console.log("🔄 Enhanced refresh-pics endpoint called");
+
+    // Collect all unassigned mails from DungHan/mustRep and QuaHan/mustRep
+    const mailsToProcess = [];
+
+    // Check DungHan/mustRep
+    const dungHanPath = path.join(MAIL_DATA_PATH, "DungHan", "mustRep");
+    console.log(`🔍 Checking DungHan path: ${dungHanPath}`);
+    console.log(`📁 DungHan exists: ${fs.existsSync(dungHanPath)}`);
+
+    if (fs.existsSync(dungHanPath)) {
+      const files = fs
+        .readdirSync(dungHanPath)
+        .filter((f) => f.endsWith(".json"));
+      console.log(`📧 Found ${files.length} JSON files in DungHan/mustRep`);
+
+      for (const file of files) {
+        const filePath = path.join(dungHanPath, file);
+        const mailData = readJsonFile(filePath);
+        console.log(`📄 Processing file: ${file}`);
+        console.log(`   Mail data exists: ${!!mailData}`);
+        console.log(
+          `   Has assignedTo: ${!!(mailData && mailData.assignedTo)}`
+        );
+
+        if (mailData && !mailData.assignedTo) {
+          console.log(`✅ Adding ${file} to processing queue`);
+          mailsToProcess.push({ filePath, mailData });
+        } else {
+          console.log(`⏭️ Skipping ${file} (already assigned or invalid)`);
+        }
+      }
+    }
+
+    // Check QuaHan/mustRep
+    const quaHanPath = path.join(MAIL_DATA_PATH, "QuaHan", "mustRep");
+    if (fs.existsSync(quaHanPath)) {
+      const files = fs
+        .readdirSync(quaHanPath)
+        .filter((f) => f.endsWith(".json"));
+      for (const file of files) {
+        const filePath = path.join(quaHanPath, file);
+        const mailData = readJsonFile(filePath);
+        if (mailData && !mailData.assignedTo) {
+          mailsToProcess.push({ filePath, mailData });
+        }
+      }
+    }
+
+    console.log(
+      `📧 Found ${mailsToProcess.length} unassigned mails to process`
+    );
+
+    // Perform batch auto-assignment
+    const assignmentResult = batchAutoAssignMails(mailsToProcess);
+
+    // Trigger refresh for connected clients
+    setTimeout(() => {
+      checkForNewMails();
+      broadcastToClients("refreshCompleted", {
+        assignedCount: assignmentResult.assignedCount,
+        totalChecked: assignmentResult.totalProcessed,
+        results: assignmentResult.results,
+        timestamp: new Date(),
+      });
+    }, 500);
+
+    res.json({
+      success: true,
+      message: `PICs refreshed successfully! Auto-assigned ${assignmentResult.assignedCount} mail(s) from ${assignmentResult.totalProcessed} checked.`,
+      assignedCount: assignmentResult.assignedCount,
+      totalChecked: assignmentResult.totalProcessed,
+      results: assignmentResult.results,
+      timestamp: new Date(),
+    });
+  } catch (error) {
+    console.error("❌ Error in refresh-pics:", error);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+      timestamp: new Date(),
+    });
+  }
 });
 
 // Manual trigger for auto-assignment testing
