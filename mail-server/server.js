@@ -1,3 +1,4 @@
+
 const express = require("express");
 const http = require("http");
 const socketIo = require("socket.io");
@@ -349,6 +350,8 @@ const autoAssignAllUnassignedMails = () => {
       "DungHan/rep",
       "QuaHan/chuaRep",
       "QuaHan/daRep",
+      "ReviewMail/pending",
+      "ReviewMail/processed",
     ];
 
     for (const folder of foldersToCheck) {
@@ -371,8 +374,16 @@ const autoAssignAllUnassignedMails = () => {
           totalChecked++;
 
           // Auto-assign if not already assigned
-          if (mailData && !mailData.assigned_to) {
-            const result = autoAssignMailToLeaderPIC(mailData, filePath);
+          if (mailData && !mailData.assignedTo && !mailData.assigned_to) {
+            let result;
+            
+            // Use modern format for ReviewMail, old format for others
+            if (folder.startsWith('ReviewMail/')) {
+              result = autoAssignMailWithModernFormat(mailData, filePath);
+            } else {
+              result = autoAssignMailToLeaderPIC(mailData, filePath);
+            }
+            
             results.push({ file, folder, ...result });
 
             if (result.success) {
@@ -385,9 +396,9 @@ const autoAssignAllUnassignedMails = () => {
                 `❌ Failed to auto-assign mail ${file} (${folder}): ${result.error}`
               );
             }
-          } else if (mailData && mailData.assigned_to) {
+          } else if (mailData && (mailData.assignedTo || mailData.assigned_to)) {
             console.log(
-              `ℹ️ Mail ${file} already assigned to ${mailData.assigned_to}`
+              `ℹ️ Mail ${file} already assigned`
             );
           }
         } catch (fileError) {
@@ -414,6 +425,138 @@ const autoAssignAllUnassignedMails = () => {
       results: [],
       error: error.message,
     };
+  }
+};
+
+// Modern auto-assign function with new assignedTo format
+const autoAssignMailWithModernFormat = (mailData, mailFilePath) => {
+  try {
+    if (!mailData) {
+      return { success: false, error: "Mail data is null or undefined" };
+    }
+
+    // Check if already assigned
+    if (mailData.assignedTo) {
+      return { success: false, error: "Mail already assigned" };
+    }
+
+    // Get sender email from multiple possible fields
+    const senderEmail = mailData.From || mailData.from || mailData.sender || mailData.EncryptedFrom;
+
+    if (!senderEmail) {
+      return { success: false, error: "No sender email found" };
+    }
+
+    // Extract domain from email
+    const senderDomain = senderEmail.includes('@') ? senderEmail.split('@')[1]?.toLowerCase() : null;
+
+    if (!senderDomain) {
+      return { success: false, error: `Invalid sender email format: ${senderEmail}` };
+    }
+
+    console.log(`🔍 Auto-assign: checking domain ${senderDomain} for mail ${path.basename(mailFilePath || 'unknown')}`);
+
+    // Load groups and find matching group
+    const groupsPath = path.join(ASSIGNMENT_DATA_PATH, "Groups");
+    if (!fs.existsSync(groupsPath)) {
+      return { success: false, error: "No groups directory found" };
+    }
+
+    const groupFiles = fs.readdirSync(groupsPath).filter(f => f.endsWith('.json'));
+    let matchingGroup = null;
+
+    // Find group with matching member email or domain
+    for (const groupFile of groupFiles) {
+      const groupPath = path.join(groupsPath, groupFile);
+      const groupData = readJsonFile(groupPath);
+
+      if (groupData && groupData.members && Array.isArray(groupData.members)) {
+        for (const member of groupData.members) {
+          const memberLower = member.toLowerCase().trim();
+          const senderLower = senderEmail.toLowerCase().trim();
+
+          // Check exact email match
+          if (memberLower === senderLower) {
+            console.log(`🎯 Exact email match: ${senderEmail} matches ${member}`);
+            matchingGroup = groupData;
+            break;
+          }
+
+          // Check domain wildcard match (*.domain.com)
+          if (memberLower.startsWith('*.') && senderDomain === memberLower.substring(2)) {
+            console.log(`🎯 Domain wildcard match: ${senderEmail} matches ${member}`);
+            matchingGroup = groupData;
+            break;
+          }
+
+          // Remove the loose includes() check that was causing false matches
+        }
+        if (matchingGroup) break;
+      }
+    }
+
+    if (!matchingGroup) {
+      return { success: false, error: `No group found for sender: ${senderEmail}` };
+    }
+
+    // Find PIC assigned to this group
+    const picsPath = path.join(ASSIGNMENT_DATA_PATH, "PIC");
+    if (!fs.existsSync(picsPath)) {
+      return { success: false, error: "No PICs directory found" };
+    }
+
+    const picFiles = fs.readdirSync(picsPath).filter(f => f.endsWith('.json'));
+    let assignedPic = null;
+
+    for (const picFile of picFiles) {
+      const picPath = path.join(picsPath, picFile);
+      const picData = readJsonFile(picPath);
+
+      if (picData && picData.groups && picData.groups.includes(matchingGroup.id)) {
+        assignedPic = picData;
+        break;
+      }
+    }
+
+    if (!assignedPic) {
+      return { success: false, error: `No PIC found for group: ${matchingGroup.name}` };
+    }
+
+    // Create assignment object in new format
+    const assignmentData = {
+      type: 'pic',
+      groupId: matchingGroup.id,
+      picId: assignedPic.id,
+      groupName: matchingGroup.name,
+      picName: assignedPic.name,
+      picEmail: assignedPic.email,
+      assignedAt: new Date().toISOString(),
+      auto_assigned: true,
+      assignment_reason: `Auto-assigned based on sender domain: ${senderDomain}`
+    };
+
+    // Update mail with assignment
+    const updatedMail = {
+      ...mailData,
+      assignedTo: assignmentData,
+      updatedAt: new Date().toISOString(),
+    };
+
+    // Save updated mail
+    if (mailFilePath && writeJsonFile(mailFilePath, updatedMail)) {
+      console.log(`✅ Auto-assigned mail to ${assignedPic.name} (${matchingGroup.name})`);
+      return {
+        success: true,
+        assignment: assignmentData,
+        updatedMail: updatedMail
+      };
+    } else {
+      return { success: false, error: "Failed to save mail assignment" };
+    }
+
+  } catch (error) {
+    console.error("Error in autoAssignMailWithModernFormat:", error);
+    return { success: false, error: error.message };
   }
 };
 
@@ -2278,9 +2421,11 @@ app.post("/api/assign-mail", (req, res) => {
   const folders = [
     "DungHan/mustRep",
     "DungHan",
+    "DungHan/rep",
     "QuaHan/chuaRep",
     "QuaHan/daRep",
-    "ReviewMail",
+    "ReviewMail/pending",
+    "ReviewMail/processed",
   ];
 
   for (const folder of folders) {
@@ -2359,7 +2504,8 @@ app.get("/api/assigned-mails", (req, res) => {
     "DungHan",
     "QuaHan/chuaRep",
     "QuaHan/daRep",
-    "ReviewMail",
+    "ReviewMail/pending",
+    "ReviewMail/processed",
   ];
 
   folders.forEach((folder) => {
@@ -2419,7 +2565,8 @@ app.post("/api/unassign-mail", (req, res) => {
     "DungHan",
     "QuaHan/chuaRep",
     "QuaHan/daRep",
-    "ReviewMail",
+    "ReviewMail/pending",
+    "ReviewMail/processed",
   ];
 
   for (const folder of folders) {
@@ -2718,13 +2865,15 @@ app.post("/api/trigger-auto-assign", (req, res) => {
   try {
     console.log("🔄 Manual auto-assignment triggered");
 
-    // Test response without calling auto-assignment
+    // Run the auto-assignment function
+    const result = autoAssignAllUnassignedMails();
+
     res.json({
       success: true,
-      message: "Auto-assignment test completed (logic disabled for debugging)",
-      assignedCount: 0,
-      totalChecked: 0,
-      results: [],
+      message: "Auto-assignment completed successfully",
+      assignedCount: result.assignedCount,
+      totalChecked: result.totalChecked,
+      results: result.results,
       timestamp: new Date(),
     });
   } catch (error) {
@@ -3031,6 +3180,23 @@ app.post("/api/move-to-review", (req, res) => {
 
     // Write the mail to ReviewMail folder
     if (writeJsonFile(reviewFilePath, reviewMailData)) {
+      // Auto-assign the mail if possible
+      try {
+        console.log(`🔄 Attempting auto-assignment for review mail...`);
+        const autoAssignResult = autoAssignMailWithModernFormat(reviewMailData, reviewFilePath);
+        
+        if (autoAssignResult.success) {
+          console.log(`✅ Auto-assigned review mail to ${autoAssignResult.assignment.picName} (${autoAssignResult.assignment.groupName})`);
+          
+          // Use the updated mail from auto-assign result (already saved by autoAssignMailWithModernFormat)
+          reviewMailData = autoAssignResult.updatedMail;
+        } else {
+          console.log(`ℹ️ Could not auto-assign review mail: ${autoAssignResult.error}`);
+        }
+      } catch (autoAssignError) {
+        console.error("❌ Error in auto-assignment for review mail (non-fatal):", autoAssignError);
+      }
+
       // Remove original mail file (we already found actualFilePath)
       if (actualFilePath && fs.existsSync(actualFilePath)) {
         try {
@@ -3694,6 +3860,23 @@ app.post("/api/move-selected-to-review", (req, res) => {
         );
 
         if (writeJsonFile(reviewFilePath, reviewMailData)) {
+          // Auto-assign the mail if possible
+          try {
+            console.log(`🔄 Batch move - attempting auto-assignment for: ${fileName}`);
+            const autoAssignResult = autoAssignMailWithModernFormat(reviewMailData, reviewFilePath);
+            
+            if (autoAssignResult.success) {
+              console.log(`✅ Batch move - auto-assigned ${fileName} to ${autoAssignResult.assignment.picName} (${autoAssignResult.assignment.groupName})`);
+              
+              // Use the updated mail from auto-assign result
+              reviewMailData = autoAssignResult.updatedMail;
+            } else {
+              console.log(`ℹ️ Batch move - could not auto-assign ${fileName}: ${autoAssignResult.error}`);
+            }
+          } catch (autoAssignError) {
+            console.error(`❌ Batch move - error in auto-assignment for ${fileName} (non-fatal):`, autoAssignError);
+          }
+
           fs.unlinkSync(originalFilePath);
           movedCount++;
           console.log(`✅ Batch move - successfully moved: ${fileName}`);
